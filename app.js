@@ -113,21 +113,31 @@ function extractQIMBit(val) {
     return (rounded % 2 !== 0) ? '1' : '0';
 }
 
-function getExpectedBits(cA, seq) {
+function getExpectedBits(cA, seq, numBits) {
     let s = '';
     for (let i = 0; i < cA.length; i++) s += robustRound(cA[i]).toString();
     const raw = s + CFG.SECRET_KEY + seq.toString();
     const hex = sha256(raw);
+    // Konversi hex ke biner, ambil sejumlah numBits (= jumlah cD koefisien)
     let bits = '';
-    for (let i = 0; i < 4; i++) bits += parseInt(hex[i], 16).toString(2).padStart(4, '0');
+    const bytesNeeded = Math.ceil(numBits / 8);
+    for (let i = 0; i < bytesNeeded; i++) {
+        bits += parseInt(hex.substring(i * 2, i * 2 + 2), 16).toString(2).padStart(8, '0');
+    }
+    bits = bits.substring(0, numBits);
     return { bits, raw, hex };
 }
 
 function verifyWatermark(received, processed, seq, mode) {
     const log = [];
-    log.push(`--- ANALISIS BLOK SEQ ${seq} ---`);
-    log.push(`[0] DATA MASUK: ${processed.length} samples`);
+    log.push('='.repeat(50));
+    log.push(`PROSES VERIFIKASI BLOK SEQ: ${seq}`);
+    log.push('='.repeat(50));
 
+    // [0] Data Masuk — tampilkan lengkap
+    log.push(`[0] Data Diterima (Raw ${processed.length}): [${processed.map(x => x.toFixed(2)).join(', ')}]`);
+
+    // Hitung MSE & PSNR
     let mseSum = 0;
     for (let i = 0; i < received.length; i++) mseSum += (received[i] - processed[i]) ** 2;
     const mse = mseSum / received.length;
@@ -135,27 +145,51 @@ function verifyWatermark(received, processed, seq, mode) {
 
     if (mode !== 'NORMAL') {
         log.push(`[SIMULASI: ${mode}]`);
-        log.push(`  MSE: ${mse.toFixed(4)} | PSNR: ${psnr.toFixed(2)} dB`);
+        log.push(`  > MSE: ${mse.toFixed(4)} | PSNR: ${psnr.toFixed(2)} dB`);
     }
 
+    // [1] DWT — tampilkan LL dan LH lengkap
     const { cA, cD } = haarDWT(processed);
-    log.push(`[1] DWT: LL[0..7] = [${Array.from(cA).slice(0, 8).map(x => x.toFixed(1)).join(', ')}]`);
+    log.push(`[1] LL (Sinyal Utama): [${Array.from(cA).map(x => x.toFixed(2)).join(', ')}]`);
+    log.push(`[1] LH (Detail/Koefisien): [${Array.from(cD).map(x => x.toFixed(2)).join(', ')}]`);
 
+    // [2] Proses Hash SHA-256
+    log.push('[2] Proses Hash SHA-256...');
+    const numBits = cD.length;
+    const { bits: expected, raw, hex } = getExpectedBits(cA, seq, numBits);
+    log.push(`  > [HASH] Input String (Robust): ${raw}`);
+    log.push(`  > [HASH] Hex: ${hex}`);
+    log.push(`  > [HASH] Expected Watermark Bits: ${expected}`);
+
+    // [3] Ekstraksi QIM — detail per koefisien
+    log.push('[3] Ekstraksi QIM dari LH...');
     let extracted = '';
-    for (let i = 0; i < cD.length; i++) extracted += extractQIMBit(cD[i]);
-    log.push(`[2] Extracted bits: ${extracted}`);
+    for (let i = 0; i < cD.length; i++) {
+        const val = cD[i];
+        const rounded = Math.round(val / CFG.QIM_DELTA);
+        const bit = (rounded % 2 !== 0) ? '1' : '0';
+        extracted += bit;
+        log.push(`  > cD[${i}] = ${val.toFixed(4)} → step=${rounded} → bit=${bit}`);
+    }
+    log.push(`  > [QIM] Extracted Bits: ${extracted}`);
 
-    const { bits: expected, raw } = getExpectedBits(cA, seq);
-    log.push(`  Hash input: ${raw.substring(0, 30)}...`);
-    log.push(`[3] Expected: ${expected}`);
-    log.push(`    Got:      ${extracted}`);
+    // [4] Verifikasi Integritas
+    log.push('[4] Verifikasi Integritas');
+    log.push(`  > Harapan: ${expected}`);
+    log.push(`    Fakta:   ${extracted}`);
 
     let errors = 0;
-    for (let i = 0; i < 16; i++) if (extracted[i] !== expected[i]) errors++;
-    const ber = (errors / 16) * 100;
+    for (let i = 0; i < numBits; i++) if (extracted[i] !== expected[i]) errors++;
+    const ber = (errors / numBits) * 100;
 
+    // [5] Kesimpulan
     const status = ber <= CFG.BER_THRESHOLD ? 'VALID' : 'INVALID';
-    log.push(`[4] BER: ${ber.toFixed(2)}% → ${status === 'VALID' ? '✅ OTENTIK' : '❌ DIMANIPULASI'}`);
+    log.push('[5] KESIMPULAN');
+    log.push(`  > Error Bits: ${errors}/${numBits}`);
+    log.push(`  > BER: ${ber.toFixed(2)}%`);
+    log.push(`  > MSE: ${mse.toFixed(4)} | PSNR: ${psnr.toFixed(2)} dB`);
+    log.push(`  > STATUS: ${status === 'VALID' ? '✅ DATA OTENTIK' : '❌ DATA DIMANIPULASI'}`);
+    log.push('='.repeat(50));
 
     return { status, ber, mse, psnr, log: log.join('\n') };
 }
