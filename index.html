@@ -1,165 +1,270 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Heart Monitor — Medical IoT Watermark Verifier</title>
-    <meta name="description" content="Real-time heart rate monitoring with semi-fragile watermark verification for secure medical IoT data integrity.">
-    
+    <title>Secure Heart Monitor — Medical IoT</title>
+    <meta name="description"
+        content="Real-time heart rate monitoring with semi-fragile watermark verification for secure medical IoT data integrity.">
+
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-    
-    <!-- MQTT.js via WebSocket -->
+    <!-- MQTT.js -->
     <script src="https://unpkg.com/mqtt@5.3.4/dist/mqtt.min.js"></script>
-    
-    <!-- js-sha256 for SHA-256 hashing -->
+    <!-- js-sha256 -->
     <script src="https://cdn.jsdelivr.net/npm/js-sha256@0.11.0/src/sha256.min.js"></script>
 
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-    <!-- Header -->
+
+    <!-- ===== HEADER ===== -->
     <header id="app-header">
         <div class="header-content">
             <div class="header-left">
-                <div class="logo-icon">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+                <div class="logo-icon" id="logoIcon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path
+                            d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
                     </svg>
                 </div>
                 <div>
                     <h1>Secure Heart Monitor</h1>
-                    <p class="header-subtitle">Semi-Fragile Watermark Verification System</p>
+                    <p class="header-sub">Watermark Verification System</p>
                 </div>
             </div>
             <div class="header-right">
-                <div class="connection-badge" id="mqttBadge">
-                    <span class="badge-dot"></span>
-                    <span class="badge-text">Connecting...</span>
+                <div class="mqtt-badge" id="mqttBadge">
+                    <span class="mqtt-dot"></span>
+                    <span class="mqtt-text">Connecting...</span>
                 </div>
+                <div class="clock" id="clock">--:--:--</div>
             </div>
         </div>
     </header>
 
-    <!-- Main Content -->
+    <!-- ===== MAIN ===== -->
     <main id="app-main">
-        <!-- Top Row: Chart + Status -->
-        <div class="top-grid">
-            <!-- Live Signal Chart -->
-            <section class="card card-chart" id="chartCard">
-                <div class="card-header">
-                    <h2>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                        Live Signal
-                    </h2>
-                    <span class="card-badge" id="dataPointCount">0 data points</span>
+
+        <!-- ROW 1: Stats Cards -->
+        <div class="stats-row" id="statsRow">
+            <div class="stat-card" id="statBPM">
+                <div class="stat-icon bpm-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                    </svg>
                 </div>
-                <div class="chart-container">
+                <div class="stat-info">
+                    <span class="stat-label">Live BPM</span>
+                    <span class="stat-value" id="bpmValue">--</span>
+                </div>
+                <div class="stat-trend" id="bpmZone">
+                    <span class="zone-badge">—</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon avg-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 3v18h18" />
+                        <path d="m19 9-5 5-4-4-3 3" />
+                    </svg>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-label">Rata-rata</span>
+                    <span class="stat-value" id="avgValue">--</span>
+                </div>
+                <div class="stat-sub">
+                    <span id="minValue">Min: --</span>
+                    <span id="maxValue">Max: --</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon pkt-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                        <path d="M16 7V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v3" />
+                    </svg>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-label">Packets</span>
+                    <span class="stat-value" id="packetCount">0</span>
+                </div>
+                <div class="stat-sub">
+                    <span id="blockCount">Blocks: 0</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon time-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-label">Latency</span>
+                    <span class="stat-value" id="latencyValue">--</span>
+                </div>
+                <div class="stat-sub">
+                    <span id="lastBlockTime">Blok terakhir: --</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ROW 2: Chart + Watermark Status -->
+        <div class="main-grid">
+            <!-- Chart -->
+            <section class="card" id="chartCard">
+                <div class="card-head">
+                    <h2>📈 Signal Monitor</h2>
+                    <span class="badge-sm" id="dpCount">0 pts</span>
+                </div>
+                <div class="chart-wrap">
                     <canvas id="bpmChart"></canvas>
                 </div>
             </section>
 
-            <!-- Status Panel -->
-            <section class="card card-status" id="statusCard">
-                <div class="bpm-display">
-                    <span class="bpm-value" id="bpmLive">--</span>
-                    <span class="bpm-unit">BPM</span>
-                    <div class="bpm-pulse" id="bpmPulse"></div>
+            <!-- Watermark Status -->
+            <section class="card" id="wmCard">
+                <div class="card-head">
+                    <h2>🔐 Watermark Status</h2>
                 </div>
-
-                <div class="divider"></div>
-
-                <!-- Watermark Status -->
-                <div class="wm-status" id="wmStatusBox">
-                    <div class="wm-icon" id="wmIcon">🛡️</div>
-                    <div class="wm-label" id="wmLabel">WAITING FOR DATA...</div>
-                </div>
-
-                <div class="metrics-grid">
-                    <div class="metric">
-                        <span class="metric-label">BER</span>
-                        <span class="metric-value" id="metricBER">— %</span>
+                <div class="wm-body">
+                    <div class="wm-hero" id="wmHero">
+                        <div class="wm-icon" id="wmIcon">🛡️</div>
+                        <div class="wm-status-text" id="wmStatusText">WAITING</div>
                     </div>
-                    <div class="metric">
-                        <span class="metric-label">PSNR</span>
-                        <span class="metric-value" id="metricPSNR">— dB</span>
+
+                    <div class="wm-metrics">
+                        <div class="wm-metric">
+                            <span class="wm-metric-label">BER</span>
+                            <span class="wm-metric-val" id="mBER">— %</span>
+                        </div>
+                        <div class="wm-metric">
+                            <span class="wm-metric-label">PSNR</span>
+                            <span class="wm-metric-val" id="mPSNR">— dB</span>
+                        </div>
+                        <div class="wm-metric">
+                            <span class="wm-metric-label">MSE</span>
+                            <span class="wm-metric-val" id="mMSE">—</span>
+                        </div>
+                        <div class="wm-metric">
+                            <span class="wm-metric-label">SEQ</span>
+                            <span class="wm-metric-val" id="mSEQ">#—</span>
+                        </div>
                     </div>
-                    <div class="metric">
-                        <span class="metric-label">MSE</span>
-                        <span class="metric-value" id="metricMSE">—</span>
-                    </div>
-                    <div class="metric">
-                        <span class="metric-label">SEQ</span>
-                        <span class="metric-value" id="metricSEQ">#—</span>
+
+                    <div class="wm-divider"></div>
+
+                    <!-- Integrity Score -->
+                    <div class="integrity-section">
+                        <div class="integrity-header">
+                            <span>Integrity Score</span>
+                            <span class="integrity-pct" id="integrityPct">—%</span>
+                        </div>
+                        <div class="integrity-bar">
+                            <div class="integrity-fill" id="integrityFill" style="width: 0%"></div>
+                        </div>
+                        <div class="integrity-detail">
+                            <span id="validBlocks">✅ 0 valid</span>
+                            <span id="invalidBlocks">❌ 0 invalid</span>
+                        </div>
                     </div>
                 </div>
             </section>
         </div>
 
-        <!-- Simulation Panel -->
-        <section class="card card-simulation">
-            <div class="card-header">
-                <h2>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
-                    Panel Pengujian (Simulasi Serangan)
-                </h2>
-            </div>
-            <div class="sim-controls">
-                <label class="sim-radio active" id="radioNormal">
-                    <input type="radio" name="attackMode" value="NORMAL" checked>
-                    <div class="sim-radio-content">
-                        <span class="sim-icon">✅</span>
-                        <span class="sim-title">NORMAL</span>
-                        <span class="sim-desc">Data asli tanpa modifikasi</span>
-                    </div>
-                </label>
-                <label class="sim-radio" id="radioNoise">
-                    <input type="radio" name="attackMode" value="NOISE">
-                    <div class="sim-radio-content">
-                        <span class="sim-icon">📡</span>
-                        <span class="sim-title">NOISE (±0.4)</span>
-                        <span class="sim-desc">Simulasi noise transmisi</span>
-                    </div>
-                </label>
-                <label class="sim-radio" id="radioAttack">
-                    <input type="radio" name="attackMode" value="ATTACK">
-                    <div class="sim-radio-content">
-                        <span class="sim-icon">⚠️</span>
-                        <span class="sim-title">ATTACK (+30)</span>
-                        <span class="sim-desc">Manipulasi data berbahaya</span>
-                    </div>
-                </label>
-            </div>
-        </section>
+        <!-- ROW 3: BER History Chart + Simulation -->
+        <div class="bottom-grid">
+            <!-- BER History -->
+            <section class="card" id="berCard">
+                <div class="card-head">
+                    <h2>📉 BER History</h2>
+                    <span class="badge-sm" id="berAvg">Avg: —%</span>
+                </div>
+                <div class="chart-wrap chart-sm">
+                    <canvas id="berChart"></canvas>
+                </div>
+            </section>
 
-        <!-- Log Panel -->
-        <section class="card card-log">
-            <div class="card-header">
-                <h2>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                    Log Proses Detail
-                </h2>
-                <button class="btn-clear" id="btnClearLog" title="Hapus Log">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                    Clear
-                </button>
+            <!-- Simulation Panel -->
+            <section class="card" id="simCard">
+                <div class="card-head">
+                    <h2>⚡ Simulasi Serangan</h2>
+                    <span class="badge-sm mode-badge" id="modeBadge">NORMAL</span>
+                </div>
+                <div class="sim-body">
+                    <label class="sim-opt active">
+                        <input type="radio" name="attackMode" value="NORMAL" checked>
+                        <div class="sim-opt-inner">
+                            <span class="sim-emoji">✅</span>
+                            <div>
+                                <strong>Normal</strong>
+                                <small>Data asli</small>
+                            </div>
+                        </div>
+                    </label>
+                    <label class="sim-opt">
+                        <input type="radio" name="attackMode" value="NOISE">
+                        <div class="sim-opt-inner">
+                            <span class="sim-emoji">📡</span>
+                            <div>
+                                <strong>Noise (±0.4)</strong>
+                                <small>Simulasi transmisi</small>
+                            </div>
+                        </div>
+                    </label>
+                    <label class="sim-opt">
+                        <input type="radio" name="attackMode" value="ATTACK">
+                        <div class="sim-opt-inner">
+                            <span class="sim-emoji">⚠️</span>
+                            <div>
+                                <strong>Attack (+30)</strong>
+                                <small>Manipulasi data</small>
+                            </div>
+                        </div>
+                    </label>
+                </div>
+            </section>
+        </div>
+
+        <!-- ROW 4: Alert + Log -->
+        <div class="alert-bar" id="alertBar" style="display:none;">
+            <span class="alert-icon">🔔</span>
+            <span class="alert-msg" id="alertMsg"></span>
+            <button class="alert-close" id="alertClose">✕</button>
+        </div>
+
+        <section class="card" id="logCard">
+            <div class="card-head">
+                <h2>📋 Log Proses</h2>
+                <button class="btn-text" id="btnClear">Clear</button>
             </div>
-            <div class="log-container" id="logContainer">
+            <div class="log-wrap" id="logWrap">
                 <pre id="logArea">Menunggu data dari ESP32...\n</pre>
             </div>
         </section>
+
     </main>
 
-    <!-- Footer -->
-    <footer id="app-footer">
-        <p>Skripsi — Secure Medical IoT Watermarking System &bull; Telkom University &bull; 2026</p>
+    <!-- ===== FOOTER ===== -->
+    <footer>
+        <p>Syauqii Usaiyyah — Tugas Akhir — Politeknik Negeri Bandung</p>
     </footer>
 
     <script src="app.js"></script>
 </body>
+
 </html>
