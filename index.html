@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Heart Monitor — Medical IoT Watermark Verifier</title>
+    <meta name="description" content="Real-time heart rate monitoring with semi-fragile watermark verification for secure medical IoT data integrity.">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    
+    <!-- MQTT.js via WebSocket -->
+    <script src="https://unpkg.com/mqtt@5.3.4/dist/mqtt.min.js"></script>
+    
+    <!-- js-sha256 for SHA-256 hashing -->
+    <script src="https://cdn.jsdelivr.net/npm/js-sha256@0.11.0/src/sha256.min.js"></script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Header -->
+    <header id="app-header">
+        <div class="header-content">
+            <div class="header-left">
+                <div class="logo-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1>Secure Heart Monitor</h1>
+                    <p class="header-subtitle">Semi-Fragile Watermark Verification System</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="connection-badge" id="mqttBadge">
+                    <span class="badge-dot"></span>
+                    <span class="badge-text">Connecting...</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main id="app-main">
+        <!-- Top Row: Chart + Status -->
+        <div class="top-grid">
+            <!-- Live Signal Chart -->
+            <section class="card card-chart" id="chartCard">
+                <div class="card-header">
+                    <h2>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                        Live Signal
+                    </h2>
+                    <span class="card-badge" id="dataPointCount">0 data points</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="bpmChart"></canvas>
+                </div>
+            </section>
+
+            <!-- Status Panel -->
+            <section class="card card-status" id="statusCard">
+                <div class="bpm-display">
+                    <span class="bpm-value" id="bpmLive">--</span>
+                    <span class="bpm-unit">BPM</span>
+                    <div class="bpm-pulse" id="bpmPulse"></div>
+                </div>
+
+                <div class="divider"></div>
+
+                <!-- Watermark Status -->
+                <div class="wm-status" id="wmStatusBox">
+                    <div class="wm-icon" id="wmIcon">🛡️</div>
+                    <div class="wm-label" id="wmLabel">WAITING FOR DATA...</div>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric">
+                        <span class="metric-label">BER</span>
+                        <span class="metric-value" id="metricBER">— %</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">PSNR</span>
+                        <span class="metric-value" id="metricPSNR">— dB</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">MSE</span>
+                        <span class="metric-value" id="metricMSE">—</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">SEQ</span>
+                        <span class="metric-value" id="metricSEQ">#—</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Simulation Panel -->
+        <section class="card card-simulation">
+            <div class="card-header">
+                <h2>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
+                    Panel Pengujian (Simulasi Serangan)
+                </h2>
+            </div>
+            <div class="sim-controls">
+                <label class="sim-radio active" id="radioNormal">
+                    <input type="radio" name="attackMode" value="NORMAL" checked>
+                    <div class="sim-radio-content">
+                        <span class="sim-icon">✅</span>
+                        <span class="sim-title">NORMAL</span>
+                        <span class="sim-desc">Data asli tanpa modifikasi</span>
+                    </div>
+                </label>
+                <label class="sim-radio" id="radioNoise">
+                    <input type="radio" name="attackMode" value="NOISE">
+                    <div class="sim-radio-content">
+                        <span class="sim-icon">📡</span>
+                        <span class="sim-title">NOISE (±0.4)</span>
+                        <span class="sim-desc">Simulasi noise transmisi</span>
+                    </div>
+                </label>
+                <label class="sim-radio" id="radioAttack">
+                    <input type="radio" name="attackMode" value="ATTACK">
+                    <div class="sim-radio-content">
+                        <span class="sim-icon">⚠️</span>
+                        <span class="sim-title">ATTACK (+30)</span>
+                        <span class="sim-desc">Manipulasi data berbahaya</span>
+                    </div>
+                </label>
+            </div>
+        </section>
+
+        <!-- Log Panel -->
+        <section class="card card-log">
+            <div class="card-header">
+                <h2>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    Log Proses Detail
+                </h2>
+                <button class="btn-clear" id="btnClearLog" title="Hapus Log">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    Clear
+                </button>
+            </div>
+            <div class="log-container" id="logContainer">
+                <pre id="logArea">Menunggu data dari ESP32...\n</pre>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer id="app-footer">
+        <p>Skripsi — Secure Medical IoT Watermarking System &bull; Telkom University &bull; 2026</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
