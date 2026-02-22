@@ -212,7 +212,7 @@
                             <span class="sim-emoji">✅</span>
                             <div>
                                 <strong>Normal</strong>
-                                <small>Data asli</small>
+                                <small>Data asli tanpa modifikasi</small>
                             </div>
                         </div>
                     </label>
@@ -222,17 +222,27 @@
                             <span class="sim-emoji">📡</span>
                             <div>
                                 <strong>Noise (±0.4)</strong>
-                                <small>Simulasi transmisi</small>
+                                <small>Gangguan transmisi</small>
                             </div>
                         </div>
                     </label>
                     <label class="sim-opt">
-                        <input type="radio" name="attackMode" value="ATTACK">
+                        <input type="radio" name="attackMode" value="ATTACK_BPM">
                         <div class="sim-opt-inner">
                             <span class="sim-emoji">⚠️</span>
                             <div>
-                                <strong>Attack (+30)</strong>
-                                <small>Manipulasi data</small>
+                                <strong>Attack BPM (+30)</strong>
+                                <small>Manipulasi nilai data</small>
+                            </div>
+                        </div>
+                    </label>
+                    <label class="sim-opt">
+                        <input type="radio" name="attackMode" value="ATTACK_KEY">
+                        <div class="sim-opt-inner">
+                            <span class="sim-emoji">🔑</span>
+                            <div>
+                                <strong>Attack Key (Palsu)</strong>
+                                <small>Re-watermark kunci salah</small>
                             </div>
                         </div>
                     </label>
