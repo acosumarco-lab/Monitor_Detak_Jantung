@@ -63,8 +63,10 @@ const CFG = {
 let attackMode = 'NORMAL';           // Mode simulasi serangan yang aktif
 let bpmHistory = [];                 // Array riwayat BPM untuk grafik
 let berHistory = [];                 // Array riwayat BER untuk grafik
+let blockHistory = [];               // Array riwayat verifikasi blok (untuk tabel)
+let dataHistory = [];                // Array riwayat data Raw vs Watermarked (untuk tabel)
 let bpmChart = null;                 // Instance Chart.js untuk grafik BPM
-let berChart = null;                 // Instance Chart.js untuk grafik BER
+let compareChart = null;             // Instance Chart.js untuk grafik perbandingan
 let mqttClient = null;               // Instance MQTT client
 
 // Statistik kumulatif
@@ -75,6 +77,13 @@ let stats = {
     invalidBlocks: 0,                // Jumlah blok yang invalid (watermark tidak cocok)
     allBPM: [],                      // Array seluruh nilai BPM untuk statistik
     lastBlockTime: null,             // Timestamp blok secure terakhir
+};
+
+// Statistik waktu komputasi ESP32
+let compStats = {
+    values: [],                      // Array waktu komputasi (ms)
+    avg: 0,
+    max: 0,
 };
 
 // ===================================================================================
@@ -101,6 +110,11 @@ const dom = {
     lastBlockTime: $('lastBlockTime'), // Waktu blok terakhir
     dpCount: $('dpCount'),           // Jumlah data point di grafik
 
+    // Computation Time
+    compValue: $('compValue'),       // Nilai waktu komputasi
+    compAvg: $('compAvg'),           // Rata-rata waktu komputasi
+    compMax: $('compMax'),           // Max waktu komputasi
+
     // Watermark Status
     wmIcon: $('wmIcon'),             // Ikon status watermark (✅ atau ⚠️)
     wmStatusText: $('wmStatusText'), // Text status watermark
@@ -112,8 +126,14 @@ const dom = {
     integrityFill: $('integrityFill'), // Progress bar integritas
     validBlocks: $('validBlocks'),   // Label blok valid
     invalidBlocks: $('invalidBlocks'), // Label blok invalid
-    berAvg: $('berAvg'),             // Rata-rata BER
     modeBadge: $('modeBadge'),       // Badge mode simulasi
+    compareMetrics: $('compareMetrics'), // Metrik perbandingan raw vs watermarked
+
+    // History Tables
+    blockHistBody: $('blockHistBody'),   // Tbody tabel history verifikasi
+    blockHistCount: $('blockHistCount'), // Badge counter blok
+    dataHistBody: $('dataHistBody'),     // Tbody tabel history data
+    dataHistCount: $('dataHistCount'),   // Badge counter data
 
     // Alert
     alertBar: $('alertBar'),         // Container alert
@@ -408,12 +428,26 @@ function getHRZone(bpm) {
  * Inisialisasi grafik BPM dan BER menggunakan Chart.js.
  */
 function initCharts() {
+    // Warna untuk light theme
+    const gridColor = 'rgba(0, 0, 0, 0.06)';
+    const tickColor = '#4a5568';
+    const tickFont = { size: 14, family: "'Poppins'", weight: '600' };
+    const tooltipStyle = {
+        backgroundColor: '#ffffff',
+        titleColor: '#1a202c',
+        bodyColor: '#4a5568',
+        borderColor: '#e2e8f0',
+        borderWidth: 1,
+        cornerRadius: 10,
+        padding: 10,
+        displayColors: false
+    };
+
     // --- Grafik BPM (Line Chart) ---
     const ctx1 = $('bpmChart').getContext('2d');
-    // Gradient merah transparan untuk fill area
     const grad = ctx1.createLinearGradient(0, 0, 0, 280);
-    grad.addColorStop(0, 'rgba(239, 68, 68, 0.2)');  // Merah transparan atas
-    grad.addColorStop(1, 'rgba(239, 68, 68, 0)');     // Transparan penuh bawah
+    grad.addColorStop(0, 'rgba(220, 38, 38, 0.15)');
+    grad.addColorStop(1, 'rgba(220, 38, 38, 0)');
 
     bpmChart = new Chart(ctx1, {
         type: 'line',
@@ -421,107 +455,96 @@ function initCharts() {
             labels: [],
             datasets: [{
                 data: [],
-                borderColor: '#ef4444',            // Warna garis merah
-                backgroundColor: grad,              // Fill gradient
-                borderWidth: 2,
-                fill: true,                          // Isi area di bawah garis
-                tension: 0.4,                        // Kelengkungan garis (smooth)
-                pointRadius: 0                       // Tanpa titik data
+                borderColor: '#dc2626',
+                backgroundColor: grad,
+                borderWidth: 2.5,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 0
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            animation: { duration: 0 },              // Animasi dimatikan (performa)
+            animation: { duration: 0 },
             scales: {
-                x: { display: false },                // Sembunyikan sumbu X
+                x: {
+                    display: true,
+                    title: { display: true, text: 'Waktu (data ke-n)', color: tickColor, font: tickFont },
+                    grid: { display: false },
+                    ticks: { display: false }
+                },
                 y: {
-                    grid: { color: 'rgba(255,255,255,0.03)', drawBorder: false },
-                    ticks: { color: '#475569', font: { size: 10, family: "'Inter'" } }
+                    title: { display: true, text: 'BPM', color: tickColor, font: tickFont },
+                    grid: { color: gridColor, drawBorder: false },
+                    ticks: { color: tickColor, font: tickFont }
                 }
             },
             plugins: {
-                legend: { display: false },           // Sembunyikan legend
-                tooltip: {
-                    backgroundColor: '#1e293b',
-                    titleColor: '#f1f5f9',
-                    bodyColor: '#94a3b8',
-                    borderColor: '#334155',
-                    borderWidth: 1,
-                    cornerRadius: 8,
-                    padding: 8,
-                    displayColors: false
-                }
+                legend: { display: false },
+                tooltip: tooltipStyle
             },
             interaction: { intersect: false, mode: 'index' }
         }
     });
 
-    // --- Grafik BER History (Bar Chart) ---
-    const ctx2 = $('berChart').getContext('2d');
-    berChart = new Chart(ctx2, {
-        type: 'bar',
+    // --- Grafik Perbandingan Raw vs Watermarked (Line Chart) ---
+    const ctx3 = $('compareChart').getContext('2d');
+    compareChart = new Chart(ctx3, {
+        type: 'line',
         data: {
-            labels: [],
-            datasets: [{
-                data: [],
-                backgroundColor: [],
-                borderRadius: 4,                     // Sudut bulat pada bar
-                maxBarThickness: 20                   // Lebar maksimal bar
-            }]
+            labels: Array.from({ length: 16 }, (_, i) => `S${i + 1}`),
+            datasets: [
+                {
+                    label: 'Raw (Asli)',
+                    data: [],
+                    borderColor: '#4f46e5',
+                    backgroundColor: 'rgba(79, 70, 229, 0.08)',
+                    borderWidth: 2.5,
+                    fill: false,
+                    tension: 0.3,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#4f46e5'
+                },
+                {
+                    label: 'Watermarked',
+                    data: [],
+                    borderColor: '#dc2626',
+                    backgroundColor: 'rgba(220, 38, 38, 0.08)',
+                    borderWidth: 2.5,
+                    borderDash: [6, 3],
+                    fill: false,
+                    tension: 0.3,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#dc2626'
+                }
+            ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            animation: { duration: 200 },             // Animasi cepat
+            animation: { duration: 300 },
             scales: {
-                x: { display: false },
+                x: {
+                    title: { display: true, text: 'Sampel ke-n (1–16)', color: tickColor, font: tickFont },
+                    grid: { display: false },
+                    ticks: { color: tickColor, font: { size: 13 } }
+                },
                 y: {
-                    min: 0, max: 100,                 // BER berkisar 0–100%
-                    grid: { color: 'rgba(255,255,255,0.03)', drawBorder: false },
-                    ticks: {
-                        color: '#475569',
-                        font: { size: 10 },
-                        callback: v => v + '%'        // Tambah suffix %
-                    }
+                    title: { display: true, text: 'Nilai BPM', color: tickColor, font: tickFont },
+                    grid: { color: gridColor, drawBorder: false },
+                    ticks: { color: tickColor, font: tickFont }
                 }
             },
             plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: { label: ctx => `BER: ${ctx.parsed.y.toFixed(2)}%` },
-                    backgroundColor: '#1e293b',
-                    titleColor: '#f1f5f9',
-                    bodyColor: '#94a3b8',
-                    borderColor: '#334155',
-                    borderWidth: 1,
-                    cornerRadius: 8,
-                    padding: 8,
-                    displayColors: false
-                }
+                legend: {
+                    display: true,
+                    labels: { color: tickColor, font: { size: 14, family: "'Poppins'", weight: '600' }, usePointStyle: true, pointStyle: 'circle' }
+                },
+                tooltip: tooltipStyle
             }
         }
     });
-
-    // --- Plugin: Garis threshold BER ---
-    // Menggambar garis putus-putus merah di nilai BER_THRESHOLD
-    const thresholdPlugin = {
-        id: 'thresholdLine',
-        afterDraw(chart) {
-            const y = chart.scales.y.getPixelForValue(CFG.BER_THRESHOLD);
-            const ctx = chart.ctx;
-            ctx.save();
-            ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';  // Merah transparan
-            ctx.lineWidth = 1;
-            ctx.setLineDash([4, 4]);                       // Pola putus-putus
-            ctx.beginPath();
-            ctx.moveTo(chart.chartArea.left, y);
-            ctx.lineTo(chart.chartArea.right, y);
-            ctx.stroke();
-            ctx.restore();
-        }
-    };
-    berChart.config.plugins = [thresholdPlugin];
 }
 
 /**
@@ -537,29 +560,6 @@ function pushBPMChart(val) {
     bpmChart.data.datasets[0].data = [...bpmHistory];            // Update data Y
     bpmChart.update('none');                           // Update tanpa animasi
     dom.dpCount.textContent = `${bpmHistory.length} pts`;        // Update counter
-}
-
-/**
- * Tambahkan data point baru ke grafik BER history.
- * Warna bar: hijau jika BER ≤ threshold, merah jika di atas.
- *
- * @param {number} ber - Nilai BER (%)
- * @param {number} seq - Nomor sequence blok
- */
-function pushBERChart(ber, seq) {
-    berHistory.push({ ber, seq });                    // Tambah data baru
-    if (berHistory.length > CFG.BER_CHART_MAX) berHistory.shift();  // Batasi jumlah bar
-    berChart.data.labels = berHistory.map(b => `#${b.seq}`);        // Label: #1, #2, ...
-    berChart.data.datasets[0].data = berHistory.map(b => b.ber);    // Data BER
-    // Warna: hijau = valid, merah = invalid
-    berChart.data.datasets[0].backgroundColor = berHistory.map(b =>
-        b.ber <= CFG.BER_THRESHOLD ? 'rgba(34,197,94,0.6)' : 'rgba(239,68,68,0.6)'
-    );
-    berChart.update();
-
-    // Hitung dan tampilkan rata-rata BER
-    const avg = berHistory.reduce((s, b) => s + b.ber, 0) / berHistory.length;
-    dom.berAvg.textContent = `Avg: ${avg.toFixed(1)}%`;
 }
 
 // ===================================================================================
@@ -660,21 +660,111 @@ function updateSecure(result, seq) {
 
     // Warna progress bar berdasarkan persentase
     if (pct >= 80) {
-        dom.integrityFill.style.background = 'linear-gradient(90deg, #22c55e, #06b6d4)';  // Hijau
-        dom.integrityPct.style.color = '#22c55e';
+        dom.integrityFill.style.background = 'linear-gradient(90deg, #16a34a, #0891b2)';  // Hijau
+        dom.integrityPct.style.color = '#16a34a';
     } else if (pct >= 50) {
-        dom.integrityFill.style.background = 'linear-gradient(90deg, #f59e0b, #f97316)';  // Kuning
-        dom.integrityPct.style.color = '#f59e0b';
+        dom.integrityFill.style.background = 'linear-gradient(90deg, #d97706, #ea580c)';  // Kuning
+        dom.integrityPct.style.color = '#d97706';
     } else {
-        dom.integrityFill.style.background = 'linear-gradient(90deg, #ef4444, #dc2626)';  // Merah
-        dom.integrityPct.style.color = '#ef4444';
+        dom.integrityFill.style.background = 'linear-gradient(90deg, #dc2626, #b91c1c)';  // Merah
+        dom.integrityPct.style.color = '#dc2626';
     }
 
-    // Update grafik BER history
-    pushBERChart(result.ber, seq);
 
     // Tambahkan log detail
     appendLog(result.log);
+}
+
+/**
+ * Tambah baris ke tabel History Verifikasi Blok.
+ * Menampilkan: Blok#, Waktu, Status (VALID/INVALID), Mode, BER, PSNR, MSE.
+ *
+ * @param {number} seq - Nomor sequence blok
+ * @param {Object} result - Hasil verifikasi { status, ber, psnr, mse }
+ * @param {string} mode - Mode serangan aktif
+ */
+function pushBlockHistory(seq, result, mode) {
+    const MAX_ROWS = 50;
+    const now = new Date().toLocaleTimeString('id-ID');
+    const isValid = result.status === 'VALID';
+
+    // Hapus placeholder "Belum ada data" jika ada
+    const empty = dom.blockHistBody.querySelector('.empty-row');
+    if (empty) empty.remove();
+
+    // Buat baris baru
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td><strong>#${seq}</strong></td>
+        <td>${now}</td>
+        <td><span class="${isValid ? 'badge-valid' : 'badge-invalid'}">${isValid ? '✅ VALID' : '❌ INVALID'}</span></td>
+        <td>${mode}</td>
+        <td class="td-num">${result.ber.toFixed(2)}</td>
+        <td class="td-num">${result.psnr.toFixed(2)}</td>
+        <td class="td-num">${result.mse.toFixed(4)}</td>
+    `;
+    dom.blockHistBody.appendChild(tr);
+
+    // Limit rows
+    blockHistory.push({ seq, status: result.status, mode, ber: result.ber, psnr: result.psnr, mse: result.mse });
+    if (blockHistory.length > MAX_ROWS) {
+        blockHistory.shift();
+        dom.blockHistBody.removeChild(dom.blockHistBody.firstElementChild);
+    }
+
+    // Update counter & scroll
+    dom.blockHistCount.textContent = `${blockHistory.length} blok`;
+    const wrap = dom.blockHistBody.closest('.table-wrap');
+    if (wrap) wrap.scrollTop = wrap.scrollHeight;
+}
+
+/**
+ * Tambah baris ke tabel History Data Raw vs Watermarked.
+ * Menampilkan: Blok#, Sample#, Raw, Watermarked, Selisih.
+ * Satu blok = 16 baris (satu per sampel).
+ *
+ * @param {number} seq - Nomor sequence blok
+ * @param {number[]} raw - Data BPM asli
+ * @param {number[]} watermarked - Data setelah watermarking
+ */
+function pushDataHistory(seq, raw, watermarked) {
+    const MAX_BLOCKS = 50;
+    if (!raw || !watermarked || raw.length === 0) return;
+
+    // Hapus placeholder "Belum ada data" jika ada
+    const empty = dom.dataHistBody.querySelector('.empty-row');
+    if (empty) empty.remove();
+
+    // Tambahkan satu baris per sampel
+    const len = Math.min(raw.length, watermarked.length);
+    for (let i = 0; i < len; i++) {
+        const diff = Math.abs(watermarked[i] - raw[i]);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${i === 0 ? '<strong>#' + seq + '</strong>' : ''}</td>
+            <td>S${i + 1}</td>
+            <td class="td-num">${raw[i]}</td>
+            <td class="td-num">${Number(watermarked[i]).toFixed(2)}</td>
+            <td class="td-num">${diff.toFixed(2)}</td>
+        `;
+        dom.dataHistBody.appendChild(tr);
+    }
+
+    // Limit blocks tracked
+    dataHistory.push({ seq, len });
+    if (dataHistory.length > MAX_BLOCKS) {
+        dataHistory.shift();
+        // Remove oldest block's rows (= oldest len rows)
+        const removeCount = dataHistory[0] ? len : len;
+        for (let i = 0; i < len && dom.dataHistBody.firstElementChild; i++) {
+            dom.dataHistBody.removeChild(dom.dataHistBody.firstElementChild);
+        }
+    }
+
+    // Update counter & scroll
+    dom.dataHistCount.textContent = `${dataHistory.length} blok`;
+    const wrap = dom.dataHistBody.closest('.table-wrap');
+    if (wrap) wrap.scrollTop = wrap.scrollHeight;
 }
 
 /**
@@ -727,22 +817,47 @@ function setMQTT(status) {
 // ===================================================================================
 
 /**
+ * Generate angka acak Gaussian (distribusi normal) menggunakan Box-Muller transform.
+ * Standar IEEE untuk simulasi noise kanal nirkabel.
+ *
+ * @param {number} mean - Rata-rata distribusi (biasanya 0)
+ * @param {number} sigma - Standar deviasi (menentukan kekuatan noise)
+ * @returns {number} - Angka acak berdistribusi Gaussian
+ */
+function gaussianRandom(mean, sigma) {
+    const u1 = Math.random();
+    const u2 = Math.random();
+    const z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+    return mean + z * sigma;
+}
+
+/**
  * Terapkan simulasi serangan pada data yang diterima.
  *
  * Mode yang didukung:
- * - NORMAL:     Data dikembalikan tanpa perubahan
- * - NOISE:      Tambah/kurangi 0.4 secara bergantian (simulasi noise transmisi)
- * - ATTACK_BPM: Tambah 30 ke semua nilai (manipulasi data langsung)
- * - ATTACK_KEY: Penyerang re-watermark data dengan kunci dan sequence palsu
+ * - NORMAL:      Data dikembalikan tanpa perubahan
+ * - AWGN_RINGAN: Gaussian noise σ=0.3 (MSE≈0.09) — noise ringan
+ * - AWGN_SEDANG: Gaussian noise σ=0.6 (MSE≈0.36) — noise sedang
+ * - AWGN_KRITIS: Gaussian noise σ=0.9 (MSE≈0.81) — mendekati batas toleransi
+ * - AWGN_HANCUR: Gaussian noise σ=1.2 (MSE≈1.44) — melebihi toleransi
+ * - ATTACK_BPM:  Tambah 30 ke semua nilai (manipulasi data langsung)
+ * - ATTACK_KEY:  Data tidak diubah, tapi kunci verifikasi diganti
  *
  * @param {number[]} data - Array data asli dari MQTT
- * @param {string} mode - Mode simulasi ('NORMAL', 'NOISE', 'ATTACK_BPM', 'ATTACK_KEY')
+ * @param {string} mode - Mode simulasi
  * @returns {number[]} - Data yang sudah diproses sesuai mode
  */
 function applyAttack(data, mode) {
-    if (mode === 'NOISE') {
-        // NOISE: Tambah +0.4 pada index genap, -0.4 pada index ganjil
-        return data.map((x, i) => i % 2 === 0 ? x + 0.4 : x - 0.4);
+    // AWGN: lookup sigma berdasarkan level
+    const awgnSigma = {
+        AWGN_RINGAN: 0.3,
+        AWGN_SEDANG: 0.6,
+        AWGN_KRITIS: 0.9,
+        AWGN_HANCUR: 1.2,
+    };
+    if (awgnSigma[mode] !== undefined) {
+        const sigma = awgnSigma[mode];
+        return data.map(x => x + gaussianRandom(0, sigma));
 
     } else if (mode === 'ATTACK_BPM') {
         // ATTACK BPM: Tambah 30 ke semua nilai BPM
@@ -757,6 +872,57 @@ function applyAttack(data, mode) {
 
     // NORMAL: kembalikan copy data tanpa perubahan
     return [...data];
+}
+
+/**
+ * Update grafik perbandingan Raw vs Watermarked dan grafik Error.
+ *
+ * @param {number[]} raw - Data BPM asli (integer, dari ESP32)
+ * @param {number[]} watermarked - Data setelah watermarking (float)
+ */
+function updateCompare(raw, watermarked) {
+    if (!compareChart || !raw || raw.length === 0) return;
+
+    // Update data compareChart
+    compareChart.data.datasets[0].data = raw;
+    compareChart.data.datasets[1].data = watermarked;
+    compareChart.update();
+    // Hitung metrik perbandingan
+    let mseSum = 0;
+    let maxErr = 0;
+    for (let i = 0; i < raw.length; i++) {
+        const diff = raw[i] - watermarked[i];
+        mseSum += diff * diff;
+        maxErr = Math.max(maxErr, Math.abs(diff));
+    }
+    const mse = mseSum / raw.length;
+    const psnr = mse === 0 ? 100.0 : 20 * Math.log10(CFG.MAX_BPM_REF / Math.sqrt(mse));
+
+    // Update metrik di bawah grafik
+    if (dom.compareMetrics) {
+        dom.compareMetrics.innerHTML = `<span>MSE: ${mse.toFixed(4)}</span><span>PSNR: ${psnr.toFixed(2)} dB</span><span>Max Error: ${maxErr.toFixed(4)}</span>`;
+    }
+}
+
+/**
+ * Update stat card Computation Time.
+ *
+ * @param {number} compMs - Waktu komputasi dalam milidetik dari ESP32
+ */
+function updateCompTime(compMs) {
+    // Simpan ke array
+    compStats.values.push(compMs);
+    if (compStats.values.length > 50) compStats.values.shift(); // Max 50 nilai
+
+    // Hitung statistik
+    const sum = compStats.values.reduce((a, b) => a + b, 0);
+    compStats.avg = sum / compStats.values.length;
+    compStats.max = Math.max(...compStats.values);
+
+    // Update DOM
+    dom.compValue.textContent = `${compMs.toFixed(2)} ms`;
+    dom.compAvg.textContent = `Avg: ${compStats.avg.toFixed(2)} ms`;
+    dom.compMax.textContent = `Max: ${compStats.max.toFixed(2)} ms`;
 }
 
 // ===================================================================================
@@ -805,11 +971,24 @@ function connectMQTT() {
 
             } else if (p.type === 'secure') {
                 // Paket secure: proses verifikasi watermark
-                const raw = p.data || [];           // Data asli dari ESP32
+                const wmData = p.data || [];         // Data watermarked dari ESP32
+                const rawData = p.raw || wmData;     // Data raw (integer BPM) dari ESP32
                 const seqNum = p.seq || 0;
-                const processed = applyAttack(raw, attackMode);  // Terapkan simulasi
-                const result = verifyWatermark(raw, processed, seqNum, attackMode);
-                updateSecure(result, seqNum);        // Update UI
+                const compMs = p.comp_ms || 0;       // Waktu komputasi ESP32 (ms)
+
+                const processed = applyAttack(wmData, attackMode);  // Terapkan simulasi
+                const result = verifyWatermark(wmData, processed, seqNum, attackMode);
+                updateSecure(result, seqNum);         // Update UI watermark
+
+                // Update grafik perbandingan (raw vs watermarked)
+                updateCompare(rawData, wmData);
+
+                // Update history tables
+                pushBlockHistory(seqNum, result, attackMode);
+                pushDataHistory(seqNum, rawData, wmData);
+
+                // Update computation time
+                if (compMs > 0) updateCompTime(compMs);
             }
         } catch (e) {
             console.error('[MQTT] Parse error:', e);

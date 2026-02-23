@@ -8,11 +8,11 @@
     <meta name="description"
         content="Real-time heart rate monitoring with semi-fragile watermark verification for secure medical IoT data integrity.">
 
-    <!-- Google Fonts -->
+    <!-- Google Fonts: Poppins + JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
         rel="stylesheet">
 
     <!-- Chart.js -->
@@ -56,7 +56,7 @@
     <!-- ===== MAIN ===== -->
     <main id="app-main">
 
-        <!-- ROW 1: Stats Cards -->
+        <!-- ROW 1: Stats Cards (5 kolom: BPM, Rata-rata, Packets, Latency, Computation Time) -->
         <div class="stats-row" id="statsRow">
             <div class="stat-card" id="statBPM">
                 <div class="stat-icon bpm-icon">
@@ -119,6 +119,24 @@
                 </div>
                 <div class="stat-sub">
                     <span id="lastBlockTime">Blok terakhir: --</span>
+                </div>
+            </div>
+
+            <!-- BARU: Stat Card Computation Time -->
+            <div class="stat-card" id="statComp">
+                <div class="stat-icon comp-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path
+                            d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                    </svg>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-label">Komputasi ESP32</span>
+                    <span class="stat-value" id="compValue">-- ms</span>
+                </div>
+                <div class="stat-sub">
+                    <span id="compAvg">Avg: --</span>
+                    <span id="compMax">Max: --</span>
                 </div>
             </div>
         </div>
@@ -186,71 +204,152 @@
             </section>
         </div>
 
-        <!-- ROW 3: BER History Chart + Simulation -->
-        <div class="bottom-grid">
-            <!-- BER History -->
-            <section class="card" id="berCard">
+        <!-- ROW 3: Grafik Perbandingan (Raw vs Watermarked) — Full Width -->
+        <section class="card" id="compareCard">
+            <div class="card-head">
+                <h2>Perbandingan: Raw vs Watermarked</h2>
+            </div>
+            <div class="chart-wrap chart-compare">
+                <canvas id="compareChart"></canvas>
+            </div>
+            <div class="compare-metrics" id="compareMetrics">
+                <span>MSE: —</span>
+                <span>PSNR: — dB</span>
+                <span>Max Error: —</span>
+            </div>
+        </section>
+
+        <!-- ROW 3b: History Tables (2 kolom) -->
+        <div class="table-grid">
+            <!-- Tabel 1: History Verifikasi Blok -->
+            <section class="card">
                 <div class="card-head">
-                    <h2>📉 BER History</h2>
-                    <span class="badge-sm" id="berAvg">Avg: —%</span>
+                    <h2>History Verifikasi Blok</h2>
+                    <span class="badge-sm" id="blockHistCount">0 blok</span>
                 </div>
-                <div class="chart-wrap chart-sm">
-                    <canvas id="berChart"></canvas>
+                <div class="table-wrap">
+                    <table class="history-table" id="blockHistTable">
+                        <thead>
+                            <tr>
+                                <th>Blok</th>
+                                <th>Waktu</th>
+                                <th>Status</th>
+                                <th>Mode</th>
+                                <th>BER (%)</th>
+                                <th>PSNR (dB)</th>
+                                <th>MSE</th>
+                            </tr>
+                        </thead>
+                        <tbody id="blockHistBody">
+                            <tr class="empty-row">
+                                <td colspan="7">Belum ada data — menunggu blok secure...</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </section>
 
-            <!-- Simulation Panel -->
-            <section class="card" id="simCard">
+            <!-- Tabel 2: History Perbandingan Raw vs Watermarked -->
+            <section class="card">
                 <div class="card-head">
-                    <h2>⚡ Simulasi Serangan</h2>
-                    <span class="badge-sm mode-badge" id="modeBadge">NORMAL</span>
+                    <h2>History Data Raw vs Watermarked</h2>
+                    <span class="badge-sm" id="dataHistCount">0 blok</span>
                 </div>
-                <div class="sim-body">
-                    <label class="sim-opt active">
-                        <input type="radio" name="attackMode" value="NORMAL" checked>
-                        <div class="sim-opt-inner">
-                            <span class="sim-emoji">✅</span>
-                            <div>
-                                <strong>Normal</strong>
-                                <small>Data asli tanpa modifikasi</small>
-                            </div>
-                        </div>
-                    </label>
-                    <label class="sim-opt">
-                        <input type="radio" name="attackMode" value="NOISE">
-                        <div class="sim-opt-inner">
-                            <span class="sim-emoji">📡</span>
-                            <div>
-                                <strong>Noise (±0.4)</strong>
-                                <small>Gangguan transmisi</small>
-                            </div>
-                        </div>
-                    </label>
-                    <label class="sim-opt">
-                        <input type="radio" name="attackMode" value="ATTACK_BPM">
-                        <div class="sim-opt-inner">
-                            <span class="sim-emoji">⚠️</span>
-                            <div>
-                                <strong>Attack BPM (+30)</strong>
-                                <small>Manipulasi nilai data</small>
-                            </div>
-                        </div>
-                    </label>
-                    <label class="sim-opt">
-                        <input type="radio" name="attackMode" value="ATTACK_KEY">
-                        <div class="sim-opt-inner">
-                            <span class="sim-emoji">🔑</span>
-                            <div>
-                                <strong>Attack Key (Palsu)</strong>
-                                <small>Re-watermark kunci salah</small>
-                            </div>
-                        </div>
-                    </label>
+                <div class="table-wrap">
+                    <table class="history-table" id="dataHistTable">
+                        <thead>
+                            <tr>
+                                <th>Blok</th>
+                                <th>S#</th>
+                                <th>Raw</th>
+                                <th>Watermarked</th>
+                                <th>Selisih</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dataHistBody">
+                            <tr class="empty-row">
+                                <td colspan="5">Belum ada data — menunggu blok secure...</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </section>
         </div>
 
-        <!-- ROW 4: Alert + Log -->
+        <!-- ROW 4: Simulation Panel (Full Width) -->
+        <section class="card" id="simCard">
+            <div class="card-head">
+                <h2>Simulasi Serangan</h2>
+                <span class="badge-sm mode-badge" id="modeBadge">NORMAL</span>
+            </div>
+            <div class="sim-body sim-row">
+                <label class="sim-opt active">
+                    <input type="radio" name="attackMode" value="NORMAL" checked>
+                    <div class="sim-opt-inner">
+                        <div>
+                            <strong>Normal</strong>
+                            <small>Data asli tanpa modifikasi</small>
+                        </div>
+                    </div>
+                </label>
+                <label class="sim-opt">
+                    <input type="radio" name="attackMode" value="AWGN_RINGAN">
+                    <div class="sim-opt-inner">
+                        <div>
+                            <strong>AWGN Ringan (σ=0.3)</strong>
+                            <small>MSE ≈ 0.09 | PSNR > 55 dB</small>
+                        </div>
+                    </div>
+                </label>
+                <label class="sim-opt">
+                    <input type="radio" name="attackMode" value="AWGN_SEDANG">
+                    <div class="sim-opt-inner">
+                        <div>
+                            <strong>AWGN Sedang (σ=0.6)</strong>
+                            <small>MSE ≈ 0.36 | PSNR ~ 45 dB</small>
+                        </div>
+                    </div>
+                </label>
+                <label class="sim-opt">
+                    <input type="radio" name="attackMode" value="AWGN_KRITIS">
+                    <div class="sim-opt-inner">
+                        <div>
+                            <strong>AWGN Kritis (σ=0.9)</strong>
+                            <small>MSE ≈ 0.81 | PSNR ~ 38 dB</small>
+                        </div>
+                    </div>
+                </label>
+                <label class="sim-opt">
+                    <input type="radio" name="attackMode" value="AWGN_HANCUR">
+                    <div class="sim-opt-inner">
+                        <div>
+                            <strong>AWGN Hancur (σ=1.2)</strong>
+                            <small>MSE ≈ 1.44 | PSNR < 30 dB</small>
+                        </div>
+                    </div>
+                </label>
+                <label class="sim-opt">
+                    <input type="radio" name="attackMode" value="ATTACK_BPM">
+                    <div class="sim-opt-inner">
+                        <div>
+                            <strong>Attack BPM (+30)</strong>
+                            <small>Manipulasi nilai data</small>
+                        </div>
+                    </div>
+                </label>
+                <label class="sim-opt">
+                    <input type="radio" name="attackMode" value="ATTACK_KEY">
+                    <div class="sim-opt-inner">
+                        <div>
+                            <strong>Attack Key (Palsu)</strong>
+                            <small>Verifikasi dengan kunci salah</small>
+                        </div>
+                    </div>
+                </label>
+            </div>
+        </section>
+
+        <!-- ROW 5: Alert + Log -->
         <div class="alert-bar" id="alertBar" style="display:none;">
             <span class="alert-icon">🔔</span>
             <span class="alert-msg" id="alertMsg"></span>
