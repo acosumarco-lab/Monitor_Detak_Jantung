@@ -572,34 +572,27 @@ body {
 }
 
 /* ===== SIMULATION ===== */
-.sim-card-normal {
-    border: 2px solid var(--green) !important;
-}
-
+.sim-card-normal,
 .sim-card-awgn-ringan {
-    border: 2px solid var(--amber) !important;
-    background-color: rgba(217, 119, 6, 0.02) !important;
+    border: 2px solid var(--green) !important;
+    background-color: rgba(22, 163, 74, 0.03) !important;
 }
 
-.sim-card-awgn-sedang {
+.sim-card-awgn-sedang,
+.sim-card-awgn-kritis {
     border: 2px solid #ea580c !important;
     background-color: rgba(234, 88, 12, 0.04) !important;
 }
 
-.sim-card-awgn-kritis {
+.sim-card-awgn-hancur {
     border: 2px solid var(--red) !important;
     background-color: rgba(220, 38, 38, 0.05) !important;
 }
 
-.sim-card-awgn-hancur {
-    border: 2px solid #991b1b !important;
-    background-color: rgba(153, 27, 27, 0.06) !important;
-}
-
 .sim-card-attack-bpm,
 .sim-card-attack-key {
-    border: 2px solid #7f1d1d !important;
-    background-color: rgba(127, 29, 29, 0.08) !important;
+    border: 2px solid var(--text) !important;
+    background-color: rgba(26, 32, 44, 0.04) !important;
 }
 
 .sim-body {
@@ -709,6 +702,30 @@ body {
 }
 
 /* ===== LOG ===== */
+.log-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.auto-scroll-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: var(--text-2);
+    cursor: pointer;
+    user-select: none;
+}
+
+.auto-scroll-toggle input {
+    accent-color: var(--accent);
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+}
+
 .log-wrap {
     max-height: 320px;
     overflow-y: auto;

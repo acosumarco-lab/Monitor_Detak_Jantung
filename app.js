@@ -144,6 +144,7 @@ const dom = {
     logArea: $('logArea'),           // Area log output
     logWrap: $('logWrap'),           // Wrapper log (untuk scroll)
     btnClear: $('btnClear'),         // Tombol clear log
+    autoScrollToggle: $('autoScrollToggle'), // Checkbox auto-scroll
 
     // Logo
     logoIcon: $('logoIcon'),         // Ikon logo (untuk animasi heartbeat)
@@ -201,20 +202,20 @@ function haarIDWT(cA, cD) {
 }
 
 /**
- * Pembulatan robust ke kelipatan 5 terdekat.
+ * Pembulatan robust ke kelipatan 10 terdekat.
  * HARUS IDENTIK dengan implementasi di sender.ino dan receiver.py.
  *
- * Rumus: floor((n / 5) + 0.5) × 5
+ * Rumus: floor((n / 10) + 0.5) × 10
  *
  * Contoh:
- *   92.63 → floor(92.63/5 + 0.5) = floor(19.026) = 19 → 95
- *   87.7  → floor(87.7/5 + 0.5)  = floor(18.04)  = 18 → 90
+ *   92.63 → floor(92.63/10 + 0.5) = floor(9.763) = 9 → 90
+ *   87.7  → floor(87.7/10 + 0.5)  = floor(9.27)  = 9 → 90
  *
  * @param {number} n - Nilai yang akan dibulatkan
- * @returns {number} - Kelipatan 5 terdekat
+ * @returns {number} - Kelipatan 10 terdekat
  */
 function robustRound(n) {
-    return Math.floor((n / 5.0) + 0.5) * 5;
+    return Math.floor((n / 10.0) + 0.5) * 10;
 }
 
 /**
@@ -252,7 +253,7 @@ function getExpectedBits(cA, seq, numBits, key) {
     // Gunakan kunci default jika tidak diberikan
     const secretKey = key || CFG.SECRET_KEY;
 
-    // Langkah 1: Robust round setiap koefisien cA
+    // Langkah 1: Robust round setiap koefisien cA ke 10
     let s = '';
     for (let i = 0; i < cA.length; i++) s += robustRound(cA[i]).toString();
 
@@ -806,7 +807,11 @@ function appendLog(text) {
         el.textContent = lines.slice(-CFG.LOG_MAX_LINES).join('\n');
     }
     el.textContent += '\n' + text + '\n';
-    dom.logWrap.scrollTop = dom.logWrap.scrollHeight;  // Auto-scroll ke bawah
+
+    // Auto-scroll hanya jika switch auto-scroll dicentang
+    if (dom.autoScrollToggle && dom.autoScrollToggle.checked) {
+        dom.logWrap.scrollTop = dom.logWrap.scrollHeight;
+    }
 }
 
 /**

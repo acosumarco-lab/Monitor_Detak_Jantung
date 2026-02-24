@@ -345,7 +345,13 @@
         <section class="card" id="logCard">
             <div class="card-head">
                 <h2><i data-lucide="terminal-square" class="h2-icon"></i> Log Proses</h2>
-                <button class="btn-text" id="btnClear">Clear</button>
+                <div class="log-actions">
+                    <label class="auto-scroll-toggle">
+                        <input type="checkbox" id="autoScrollToggle" checked>
+                        <span>Auto-scroll</span>
+                    </label>
+                    <button class="btn-text" id="btnClear">Clear</button>
+                </div>
             </div>
             <div class="log-wrap" id="logWrap">
                 <pre id="logArea">Menunggu data dari ESP32...\n</pre>
