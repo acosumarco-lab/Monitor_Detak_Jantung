@@ -391,7 +391,7 @@ function verifyWatermark(received, processed, seq, mode) {
     log.push(`  > Error Bits: ${errors}/${numBits}`);
     log.push(`  > BER: ${ber.toFixed(2)}%`);
     log.push(`  > MSE: ${mse.toFixed(4)} | PSNR: ${psnr.toFixed(2)} dB`);
-    log.push(`  > STATUS: ${status === 'VALID' ? '✅ DATA OTENTIK' : '❌ DATA DIMANIPULASI'}`);
+    log.push(`  > STATUS: ${status === 'VALID' ? '[VALID] DATA OTENTIK' : '[INVALID] DATA DIMANIPULASI'}`);
     log.push('='.repeat(50));
 
     return { status, ber, mse, psnr, log: log.join('\n') };
@@ -605,9 +605,9 @@ function updateLiveBPM(val) {
 
     // Alert untuk BPM abnormal
     if (val < CFG.ALERT_BPM_LOW) {
-        showAlert(`⚠️ BPM rendah terdeteksi: ${val} BPM (< ${CFG.ALERT_BPM_LOW})`, 'warning');
+        showAlert(`BPM rendah terdeteksi: ${val} BPM (< ${CFG.ALERT_BPM_LOW})`, 'warning');
     } else if (val > CFG.ALERT_BPM_HIGH) {
-        showAlert(`🔴 BPM tinggi terdeteksi: ${val} BPM (> ${CFG.ALERT_BPM_HIGH})`, 'danger');
+        showAlert(`BPM tinggi terdeteksi: ${val} BPM (> ${CFG.ALERT_BPM_HIGH})`, 'danger');
     }
 }
 
@@ -626,16 +626,20 @@ function updateSecure(result, seq) {
 
     // Update ikon dan teks status
     if (result.status === 'VALID') {
-        dom.wmIcon.textContent = '✅';
+        dom.wmIcon.innerHTML = '<i data-lucide="shield-check" style="width:48px;height:48px;stroke-width:1.5;"></i>';
+        dom.wmIcon.className = 'wm-icon valid';
         dom.wmStatusText.textContent = 'DATA OTENTIK';
         dom.wmStatusText.className = 'wm-status-text valid';
         stats.validBlocks++;
     } else {
-        dom.wmIcon.textContent = '⚠️';
+        dom.wmIcon.innerHTML = '<div class="beacon-dot"></div>';
+        dom.wmIcon.className = 'wm-icon beacon-danger';
         dom.wmStatusText.textContent = 'DATA DIMANIPULASI';
         dom.wmStatusText.className = 'wm-status-text invalid';
         stats.invalidBlocks++;
     }
+
+    if (window.lucide) lucide.createIcons({ root: dom.wmIcon });
 
     // Update counter blok
     stats.blockCount++;
@@ -655,8 +659,12 @@ function updateSecure(result, seq) {
     const pct = total > 0 ? ((stats.validBlocks / total) * 100).toFixed(1) : 0;
     dom.integrityPct.textContent = `${pct}%`;
     dom.integrityFill.style.width = `${pct}%`;
-    dom.validBlocks.textContent = `✅ ${stats.validBlocks} valid`;
-    dom.invalidBlocks.textContent = `❌ ${stats.invalidBlocks} invalid`;
+    dom.validBlocks.innerHTML = `<i data-lucide="check-circle-2" class="inline-icon"></i> ${stats.validBlocks} valid`;
+    dom.invalidBlocks.innerHTML = `<i data-lucide="x-circle" class="inline-icon"></i> ${stats.invalidBlocks} invalid`;
+    if (window.lucide) {
+        lucide.createIcons({ root: dom.validBlocks });
+        lucide.createIcons({ root: dom.invalidBlocks });
+    }
 
     // Warna progress bar berdasarkan persentase
     if (pct >= 80) {
@@ -697,13 +705,14 @@ function pushBlockHistory(seq, result, mode) {
     tr.innerHTML = `
         <td><strong>#${seq}</strong></td>
         <td>${now}</td>
-        <td><span class="${isValid ? 'badge-valid' : 'badge-invalid'}">${isValid ? '✅ VALID' : '❌ INVALID'}</span></td>
+        <td><span class="${isValid ? 'badge-valid' : 'badge-invalid'}">${isValid ? '<i data-lucide="check" class="inline-icon" style="width:14px;height:14px;"></i> VALID' : '<i data-lucide="x" class="inline-icon" style="width:14px;height:14px;"></i> INVALID'}</span></td>
         <td>${mode}</td>
         <td class="td-num">${result.ber.toFixed(2)}</td>
         <td class="td-num">${result.psnr.toFixed(2)}</td>
         <td class="td-num">${result.mse.toFixed(4)}</td>
     `;
     dom.blockHistBody.appendChild(tr);
+    if (window.lucide) lucide.createIcons({ root: tr });
 
     // Limit rows
     blockHistory.push({ seq, status: result.status, mode, ber: result.ber, psnr: result.psnr, mse: result.mse });
@@ -1005,6 +1014,14 @@ function connectMQTT() {
  */
 function initEvents() {
     // --- Radio buttons simulasi serangan ---
+    // Fungsi untuk update warna kartu simulasi
+    const updateSimCardColor = () => {
+        const simCard = document.getElementById('simCard');
+        if (simCard) {
+            simCard.className = 'card sim-card-' + attackMode.toLowerCase().replace(/_/g, '-');
+        }
+    };
+
     document.querySelectorAll('input[name="attackMode"]').forEach(r => {
         r.addEventListener('change', e => {
             attackMode = e.target.value;           // Update mode aktif
@@ -1013,6 +1030,8 @@ function initEvents() {
             // Highlight radio button yang aktif
             document.querySelectorAll('.sim-opt').forEach(l => l.classList.remove('active'));
             e.target.closest('.sim-opt').classList.add('active');
+
+            updateSimCardColor();
         });
     });
 
@@ -1044,4 +1063,12 @@ document.addEventListener('DOMContentLoaded', () => {
     initEvents();                                  // Pasang event handlers
     connectMQTT();                                 // Hubungkan ke MQTT
     dom.clock.textContent = new Date().toLocaleTimeString('id-ID', { hour12: false });  // Set jam awal
+
+    if (window.lucide) lucide.createIcons();       // Buat icon lucide pertama kali
+
+    // Inisialisasi warna kartu simulasi
+    const simCard = document.getElementById('simCard');
+    if (simCard) {
+        simCard.className = 'card sim-card-' + attackMode.toLowerCase().replace(/_/g, '-');
+    }
 });

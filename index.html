@@ -8,11 +8,11 @@
     <meta name="description"
         content="Real-time heart rate monitoring with semi-fragile watermark verification for secure medical IoT data integrity.">
 
-    <!-- Google Fonts: Poppins + JetBrains Mono -->
+    <!-- Google Fonts: Plus Jakarta Sans + JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
         rel="stylesheet">
 
     <!-- Chart.js -->
@@ -21,6 +21,8 @@
     <script src="https://unpkg.com/mqtt@5.3.4/dist/mqtt.min.js"></script>
     <!-- js-sha256 -->
     <script src="https://cdn.jsdelivr.net/npm/js-sha256@0.11.0/src/sha256.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 
     <link rel="stylesheet" href="style.css">
 </head>
@@ -32,11 +34,7 @@
         <div class="header-content">
             <div class="header-left">
                 <div class="logo-icon" id="logoIcon">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <path
-                            d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
-                    </svg>
+                    <i data-lucide="activity" style="width:24px;height:24px;color:currentColor;stroke-width:2.5"></i>
                 </div>
                 <div>
                     <h1>Secure Heart Monitor</h1>
@@ -60,9 +58,7 @@
         <div class="stats-row" id="statsRow">
             <div class="stat-card" id="statBPM">
                 <div class="stat-icon bpm-icon">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-                    </svg>
+                    <i data-lucide="heart-pulse"></i>
                 </div>
                 <div class="stat-info">
                     <span class="stat-label">Live BPM</span>
@@ -75,10 +71,7 @@
 
             <div class="stat-card">
                 <div class="stat-icon avg-icon">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 3v18h18" />
-                        <path d="m19 9-5 5-4-4-3 3" />
-                    </svg>
+                    <i data-lucide="activity-square"></i>
                 </div>
                 <div class="stat-info">
                     <span class="stat-label">Rata-rata</span>
@@ -92,10 +85,7 @@
 
             <div class="stat-card">
                 <div class="stat-icon pkt-icon">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-                        <path d="M16 7V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v3" />
-                    </svg>
+                    <i data-lucide="server"></i>
                 </div>
                 <div class="stat-info">
                     <span class="stat-label">Packets</span>
@@ -108,10 +98,7 @@
 
             <div class="stat-card">
                 <div class="stat-icon time-icon">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10" />
-                        <polyline points="12 6 12 12 16 14" />
-                    </svg>
+                    <i data-lucide="clock"></i>
                 </div>
                 <div class="stat-info">
                     <span class="stat-label">Latency</span>
@@ -125,10 +112,7 @@
             <!-- BARU: Stat Card Computation Time -->
             <div class="stat-card" id="statComp">
                 <div class="stat-icon comp-icon">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path
-                            d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-                    </svg>
+                    <i data-lucide="cpu"></i>
                 </div>
                 <div class="stat-info">
                     <span class="stat-label">Komputasi ESP32</span>
@@ -146,7 +130,7 @@
             <!-- Chart -->
             <section class="card" id="chartCard">
                 <div class="card-head">
-                    <h2>📈 Signal Monitor</h2>
+                    <h2><i data-lucide="line-chart" class="h2-icon"></i> Signal Monitor</h2>
                     <span class="badge-sm" id="dpCount">0 pts</span>
                 </div>
                 <div class="chart-wrap">
@@ -157,11 +141,12 @@
             <!-- Watermark Status -->
             <section class="card" id="wmCard">
                 <div class="card-head">
-                    <h2>🔐 Watermark Status</h2>
+                    <h2><i data-lucide="shield" class="h2-icon"></i> Watermark Status</h2>
                 </div>
                 <div class="wm-body">
                     <div class="wm-hero" id="wmHero">
-                        <div class="wm-icon" id="wmIcon">🛡️</div>
+                        <div class="wm-icon" id="wmIcon"><i data-lucide="shield" style="width:48px;height:48px;"></i>
+                        </div>
                         <div class="wm-status-text" id="wmStatusText">WAITING</div>
                     </div>
 
@@ -196,8 +181,9 @@
                             <div class="integrity-fill" id="integrityFill" style="width: 0%"></div>
                         </div>
                         <div class="integrity-detail">
-                            <span id="validBlocks">✅ 0 valid</span>
-                            <span id="invalidBlocks">❌ 0 invalid</span>
+                            <span id="validBlocks"><i data-lucide="check-circle-2" class="inline-icon"></i> 0
+                                valid</span>
+                            <span id="invalidBlocks"><i data-lucide="x-circle" class="inline-icon"></i> 0 invalid</span>
                         </div>
                     </div>
                 </div>
@@ -207,7 +193,7 @@
         <!-- ROW 3: Grafik Perbandingan (Raw vs Watermarked) — Full Width -->
         <section class="card" id="compareCard">
             <div class="card-head">
-                <h2>Perbandingan: Raw vs Watermarked</h2>
+                <h2><i data-lucide="git-compare" class="h2-icon"></i> Perbandingan: Raw vs Watermarked</h2>
             </div>
             <div class="chart-wrap chart-compare">
                 <canvas id="compareChart"></canvas>
@@ -224,7 +210,7 @@
             <!-- Tabel 1: History Verifikasi Blok -->
             <section class="card">
                 <div class="card-head">
-                    <h2>History Verifikasi Blok</h2>
+                    <h2><i data-lucide="history" class="h2-icon"></i> History Verifikasi Blok</h2>
                     <span class="badge-sm" id="blockHistCount">0 blok</span>
                 </div>
                 <div class="table-wrap">
@@ -252,7 +238,7 @@
             <!-- Tabel 2: History Perbandingan Raw vs Watermarked -->
             <section class="card">
                 <div class="card-head">
-                    <h2>History Data Raw vs Watermarked</h2>
+                    <h2><i data-lucide="database" class="h2-icon"></i> History Data Raw vs Watermarked</h2>
                     <span class="badge-sm" id="dataHistCount">0 blok</span>
                 </div>
                 <div class="table-wrap">
@@ -279,7 +265,7 @@
         <!-- ROW 4: Simulation Panel (Full Width) -->
         <section class="card" id="simCard">
             <div class="card-head">
-                <h2>Simulasi Serangan</h2>
+                <h2><i data-lucide="swords" class="h2-icon"></i> Simulasi Serangan</h2>
                 <span class="badge-sm mode-badge" id="modeBadge">NORMAL</span>
             </div>
             <div class="sim-body sim-row">
@@ -351,14 +337,14 @@
 
         <!-- ROW 5: Alert + Log -->
         <div class="alert-bar" id="alertBar" style="display:none;">
-            <span class="alert-icon">🔔</span>
+            <span class="alert-icon"><i data-lucide="bell"></i></span>
             <span class="alert-msg" id="alertMsg"></span>
-            <button class="alert-close" id="alertClose">✕</button>
+            <button class="alert-close" id="alertClose"><i data-lucide="x" style="width:16px;height:16px;"></i></button>
         </div>
 
         <section class="card" id="logCard">
             <div class="card-head">
-                <h2>📋 Log Proses</h2>
+                <h2><i data-lucide="terminal-square" class="h2-icon"></i> Log Proses</h2>
                 <button class="btn-text" id="btnClear">Clear</button>
             </div>
             <div class="log-wrap" id="logWrap">

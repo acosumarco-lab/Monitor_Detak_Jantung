@@ -31,7 +31,7 @@
     --amber: #d97706;
     --cyan: #0891b2;
 
-    --font: 'Poppins', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     --mono: 'JetBrains Mono', 'Consolas', monospace;
     --radius: 14px;
     --radius-sm: 10px;
@@ -323,6 +323,24 @@ body {
     border-radius: var(--radius);
     overflow: hidden;
     box-shadow: var(--shadow-sm);
+    transition: border-color 0.3s, background-color 0.3s;
+}
+
+.h2-icon {
+    display: inline-block;
+    vertical-align: text-bottom;
+    width: 20px;
+    height: 20px;
+    margin-right: 6px;
+    color: var(--text-2);
+}
+
+.inline-icon {
+    display: inline-block;
+    vertical-align: text-bottom;
+    width: 16px;
+    height: 16px;
+    margin-right: 4px;
 }
 
 .card-head {
@@ -408,9 +426,43 @@ body {
 }
 
 .wm-icon {
+    display: flex;
+    justify-content: center;
+    align-items: center;
     font-size: 3rem;
     line-height: 1;
     margin-bottom: 10px;
+    min-height: 48px;
+}
+
+.wm-icon.valid {
+    color: var(--green);
+}
+
+@keyframes beacon-pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+    }
+
+    70% {
+        box-shadow: 0 0 0 20px rgba(220, 38, 38, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+    }
+}
+
+.beacon-danger {
+    color: var(--red);
+}
+
+.beacon-dot {
+    width: 36px;
+    height: 36px;
+    background-color: var(--red);
+    border-radius: 50%;
+    animation: beacon-pulse 1.5s infinite;
 }
 
 .wm-status-text {
@@ -520,6 +572,36 @@ body {
 }
 
 /* ===== SIMULATION ===== */
+.sim-card-normal {
+    border: 2px solid var(--green) !important;
+}
+
+.sim-card-awgn-ringan {
+    border: 2px solid var(--amber) !important;
+    background-color: rgba(217, 119, 6, 0.02) !important;
+}
+
+.sim-card-awgn-sedang {
+    border: 2px solid #ea580c !important;
+    background-color: rgba(234, 88, 12, 0.04) !important;
+}
+
+.sim-card-awgn-kritis {
+    border: 2px solid var(--red) !important;
+    background-color: rgba(220, 38, 38, 0.05) !important;
+}
+
+.sim-card-awgn-hancur {
+    border: 2px solid #991b1b !important;
+    background-color: rgba(153, 27, 27, 0.06) !important;
+}
+
+.sim-card-attack-bpm,
+.sim-card-attack-key {
+    border: 2px solid #7f1d1d !important;
+    background-color: rgba(127, 29, 29, 0.08) !important;
+}
+
 .sim-body {
     padding: 16px 20px;
     display: flex;
@@ -648,11 +730,12 @@ body {
 
 #logArea {
     font-family: var(--mono);
-    font-size: 0.9rem;
-    line-height: 1.8;
-    color: var(--text);
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: var(--text-2);
     white-space: pre-wrap;
     word-break: break-word;
+    font-weight: 400;
 }
 
 .btn-text {
@@ -730,6 +813,7 @@ body {
     border-bottom: 1px solid var(--border);
     color: var(--text);
     white-space: nowrap;
+    font-weight: 400;
 }
 
 .history-table tbody tr:nth-child(even) {
