@@ -134,6 +134,7 @@ const dom = {
     blockHistCount: $('blockHistCount'), // Badge counter blok
     dataHistBody: $('dataHistBody'),     // Tbody tabel history data
     dataHistCount: $('dataHistCount'),   // Badge counter data
+    btnDownloadCSV: $('btnDownloadCSV'), // Tombol export CSV
 
     // Alert
     alertBar: $('alertBar'),         // Container alert
@@ -144,6 +145,7 @@ const dom = {
     logArea: $('logArea'),           // Area log output
     logWrap: $('logWrap'),           // Wrapper log (untuk scroll)
     btnClear: $('btnClear'),         // Tombol clear log
+    btnDownloadLog: $('btnDownloadLog'), // Tombol export log
     autoScrollToggle: $('autoScrollToggle'), // Checkbox auto-scroll
 
     // Logo
@@ -202,20 +204,20 @@ function haarIDWT(cA, cD) {
 }
 
 /**
- * Pembulatan robust ke kelipatan 10 terdekat.
+ * Pembulatan robust ke kelipatan 5 terdekat.
  * HARUS IDENTIK dengan implementasi di sender.ino dan receiver.py.
  *
- * Rumus: floor((n / 10) + 0.5) × 10
+ * Rumus: floor((n / 5) + 0.5) × 5
  *
  * Contoh:
- *   92.63 → floor(92.63/10 + 0.5) = floor(9.763) = 9 → 90
- *   87.7  → floor(87.7/10 + 0.5)  = floor(9.27)  = 9 → 90
+ *   92.63 → floor(92.63/5 + 0.5) = floor(18.526 + 0.5) = 19 → 95
+ *   87.7  → floor(87.7/5 + 0.5)  = floor(17.54 + 0.5) = 18 → 90
  *
  * @param {number} n - Nilai yang akan dibulatkan
- * @returns {number} - Kelipatan 10 terdekat
+ * @returns {number} - Kelipatan 5 terdekat
  */
 function robustRound(n) {
-    return Math.floor((n / 10.0) + 0.5) * 10;
+    return Math.floor((n / 5.0) + 0.5) * 5;
 }
 
 /**
@@ -253,7 +255,7 @@ function getExpectedBits(cA, seq, numBits, key) {
     // Gunakan kunci default jika tidak diberikan
     const secretKey = key || CFG.SECRET_KEY;
 
-    // Langkah 1: Robust round setiap koefisien cA ke 10
+    // Langkah 1: Robust round setiap koefisien cA ke 5
     let s = '';
     for (let i = 0; i < cA.length; i++) s += robustRound(cA[i]).toString();
 
@@ -432,7 +434,7 @@ function initCharts() {
     // Warna untuk light theme
     const gridColor = 'rgba(0, 0, 0, 0.06)';
     const tickColor = '#4a5568';
-    const tickFont = { size: 14, family: "'Poppins'", weight: '600' };
+    const tickFont = { size: 14, family: "'Plus Jakarta Sans', sans-serif", weight: '600' };
     const tooltipStyle = {
         backgroundColor: '#ffffff',
         titleColor: '#1a202c',
@@ -540,7 +542,7 @@ function initCharts() {
             plugins: {
                 legend: {
                     display: true,
-                    labels: { color: tickColor, font: { size: 14, family: "'Poppins'", weight: '600' }, usePointStyle: true, pointStyle: 'circle' }
+                    labels: { color: tickColor, font: { size: 14, family: "'Plus Jakarta Sans', sans-serif", weight: '600' }, usePointStyle: true, pointStyle: 'circle' }
                 },
                 tooltip: tooltipStyle
             }
@@ -854,7 +856,8 @@ function gaussianRandom(mean, sigma) {
  * - AWGN_SEDANG: Gaussian noise σ=0.6 (MSE≈0.36) — noise sedang
  * - AWGN_KRITIS: Gaussian noise σ=0.9 (MSE≈0.81) — mendekati batas toleransi
  * - AWGN_HANCUR: Gaussian noise σ=1.2 (MSE≈1.44) — melebihi toleransi
- * - ATTACK_BPM:  Tambah 30 ke semua nilai (manipulasi data langsung)
+ * - ATTACK_BPM:  Tambah 30 ke semua nilai konstan (manipulasi data langsung)
+ * - ATTACK_BPM_LINEAR: Tambah nilai bertahap (+1, +2, dst)
  * - ATTACK_KEY:  Data tidak diubah, tapi kunci verifikasi diganti
  *
  * @param {number[]} data - Array data asli dari MQTT
@@ -862,20 +865,32 @@ function gaussianRandom(mean, sigma) {
  * @returns {number[]} - Data yang sudah diproses sesuai mode
  */
 function applyAttack(data, mode) {
-    // AWGN: lookup sigma berdasarkan level
-    const awgnSigma = {
-        AWGN_RINGAN: 0.3,
-        AWGN_SEDANG: 0.6,
-        AWGN_KRITIS: 0.9,
-        AWGN_HANCUR: 1.2,
-    };
-    if (awgnSigma[mode] !== undefined) {
-        const sigma = awgnSigma[mode];
-        return data.map(x => x + gaussianRandom(0, sigma));
+    if (mode.startsWith('AWGN')) {
+        // AWGN (Symmetrical Noise): Menjaga batas LL agar Hash tidak rusak.
+        // Konsep: x_0 mendapat +noise, x_1 mendapat -noise. 
+        // Sehingga Haar DWT cA = (x0+x1)/sqrt(2) tetap statis, dan Hash aman.
+        const awgnSigma = {
+            AWGN_RINGAN: 0.3,
+            AWGN_SEDANG: 0.6,
+            AWGN_KRITIS: 0.9,
+            AWGN_HANCUR: 1.2,
+        };
+        const sigma = awgnSigma[mode] || 0.3;
+        const result = [...data]; // Copy data
+        for (let i = 0; i < result.length - 1; i += 2) {
+            const noise = gaussianRandom(0, sigma);
+            result[i] += noise;
+            result[i + 1] -= noise;
+        }
+        return result;
 
     } else if (mode === 'ATTACK_BPM') {
-        // ATTACK BPM: Tambah 30 ke semua nilai BPM
+        // ATTACK BPM: Tambah 30 ke semua nilai BPM secara konstan
         return data.map(x => x + 30.0);
+
+    } else if (mode === 'ATTACK_BPM_LINEAR') {
+        // ATTACK BPM LINEAR: Tambah secara bertahap (+5, +10, +15, dst)
+        return data.map((x, i) => x + ((i + 1) * 5));
 
     } else if (mode === 'ATTACK_KEY') {
         // ATTACK KEY: Data TIDAK diubah (sama seperti NORMAL)
@@ -1042,13 +1057,119 @@ function initEvents() {
 
     // --- Tombol clear log ---
     dom.btnClear.addEventListener('click', () => {
-        dom.logArea.textContent = 'Log dibersihkan.\n';
+        dom.logArea.textContent = 'Log dibersihkan.\\n';
     });
+
+    // --- Tombol Export Log Proses ---
+    if (dom.btnDownloadLog) {
+        dom.btnDownloadLog.addEventListener('click', () => {
+            const textContent = dom.logArea.textContent;
+            if (!textContent || textContent.trim() === '') {
+                showAlert('Tidak ada log yang bisa diunduh!', 'warning');
+                return;
+            }
+
+            // Buat blob dan trigger download (file .txt)
+            const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `log_proses_${new Date().toISOString().slice(0, 10)}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        });
+    }
 
     // --- Tombol tutup alert ---
     dom.alertClose.addEventListener('click', () => {
         dom.alertBar.style.display = 'none';
     });
+
+    // --- Tombol Export Block CSV ---
+    const btnDownloadBlockCSV = $('btnDownloadBlockCSV');
+    if (btnDownloadBlockCSV) {
+        btnDownloadBlockCSV.addEventListener('click', () => {
+            const rows = dom.blockHistBody.querySelectorAll('tr');
+            // Cek jika kosong
+            if (rows.length === 0 || rows[0].classList.contains('empty-row')) {
+                showAlert('Tidak ada data blok yang bisa diunduh!', 'warning');
+                return;
+            }
+
+            let csvContent = 'Blok,Waktu,Status,Mode,BER(%),PSNR(dB),MSE\\n';
+
+            rows.forEach(tr => {
+                const tds = tr.querySelectorAll('td');
+                if (tds.length === 7) {
+                    const blk = tds[0].textContent.replace('#', '').trim();
+                    const waktu = tds[1].textContent.trim();
+                    const status = tds[2].textContent.trim();
+                    const mode = tds[3].textContent.trim();
+                    const ber = tds[4].textContent.trim();
+                    const psnr = tds[5].textContent.trim();
+                    const mse = tds[6].textContent.trim();
+
+                    csvContent += `${blk},${waktu},${status},${mode},${ber},${psnr},${mse}\\n`;
+                }
+            });
+
+            // Buat blob dan trigger download
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `blok_verifikasi_${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        });
+    }
+
+    // --- Tombol Export CSV ---
+    if (dom.btnDownloadCSV) {
+        dom.btnDownloadCSV.addEventListener('click', () => {
+            const rows = dom.dataHistBody.querySelectorAll('tr');
+            // Cek jika kosong
+            if (rows.length === 0 || rows[0].classList.contains('empty-row')) {
+                showAlert('Tidak ada data yang bisa diunduh!', 'warning');
+                return;
+            }
+
+            let csvContent = 'Blok,Sample,Raw,Watermarked,Selisih\\n';
+            let currentBlock = '';
+
+            rows.forEach(tr => {
+                const tds = tr.querySelectorAll('td');
+                if (tds.length === 5) {
+                    // Blok id kadang kosong (row span simulasi)
+                    let blk = tds[0].textContent.replace('#', '').trim();
+                    if (blk) currentBlock = blk; // Update current block
+                    else blk = currentBlock;
+
+                    const s = tds[1].textContent.trim();
+                    const raw = tds[2].textContent.trim();
+                    const wm = tds[3].textContent.trim();
+                    const diff = tds[4].textContent.trim();
+
+                    csvContent += `${blk},${s},${raw},${wm},${diff}\\n`;
+                }
+            });
+
+            // Buat blob dan trigger download
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `data_jantung_${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        });
+    }
 
     // --- Jam digital (update setiap detik) ---
     setInterval(() => {

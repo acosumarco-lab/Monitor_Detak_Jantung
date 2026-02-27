@@ -211,7 +211,13 @@
             <section class="card">
                 <div class="card-head">
                     <h2><i data-lucide="history" class="h2-icon"></i> History Verifikasi Blok</h2>
-                    <span class="badge-sm" id="blockHistCount">0 blok</span>
+                    <div class="log-actions">
+                        <span class="badge-sm" id="blockHistCount">0 blok</span>
+                        <button class="btn-text" id="btnDownloadBlockCSV" title="Download Block History (CSV)"><i
+                                data-lucide="download"
+                                style="width:16px;height:16px;vertical-align:text-bottom;margin-right:4px;"></i>
+                            Export</button>
+                    </div>
                 </div>
                 <div class="table-wrap">
                     <table class="history-table" id="blockHistTable">
@@ -239,7 +245,13 @@
             <section class="card">
                 <div class="card-head">
                     <h2><i data-lucide="database" class="h2-icon"></i> History Data Raw vs Watermarked</h2>
-                    <span class="badge-sm" id="dataHistCount">0 blok</span>
+                    <div class="log-actions">
+                        <span class="badge-sm" id="dataHistCount">0 blok</span>
+                        <button class="btn-text" id="btnDownloadCSV" title="Download Data History (CSV)"><i
+                                data-lucide="download"
+                                style="width:16px;height:16px;vertical-align:text-bottom;margin-right:4px;"></i>
+                            Export</button>
+                    </div>
                 </div>
                 <div class="table-wrap">
                     <table class="history-table" id="dataHistTable">
@@ -282,8 +294,8 @@
                     <input type="radio" name="attackMode" value="AWGN_RINGAN">
                     <div class="sim-opt-inner">
                         <div>
-                            <strong>AWGN Ringan (σ=0.3)</strong>
-                            <small>MSE ≈ 0.09 | PSNR > 55 dB</small>
+                            <strong>AWGN Ringan (Simetris σ=0.3)</strong>
+                            <small>Sistem aman (Valid)</small>
                         </div>
                     </div>
                 </label>
@@ -291,8 +303,8 @@
                     <input type="radio" name="attackMode" value="AWGN_SEDANG">
                     <div class="sim-opt-inner">
                         <div>
-                            <strong>AWGN Sedang (σ=0.6)</strong>
-                            <small>MSE ≈ 0.36 | PSNR ~ 45 dB</small>
+                            <strong>AWGN Sedang (Simetris σ=0.6)</strong>
+                            <small>Batas QIM mulai terganggu</small>
                         </div>
                     </div>
                 </label>
@@ -300,8 +312,8 @@
                     <input type="radio" name="attackMode" value="AWGN_KRITIS">
                     <div class="sim-opt-inner">
                         <div>
-                            <strong>AWGN Kritis (σ=0.9)</strong>
-                            <small>MSE ≈ 0.81 | PSNR ~ 38 dB</small>
+                            <strong>AWGN Kritis (Simetris σ=0.9)</strong>
+                            <small>Batas QIM terlampaui (Invalid)</small>
                         </div>
                     </div>
                 </label>
@@ -309,8 +321,8 @@
                     <input type="radio" name="attackMode" value="AWGN_HANCUR">
                     <div class="sim-opt-inner">
                         <div>
-                            <strong>AWGN Hancur (σ=1.2)</strong>
-                            <small>MSE ≈ 1.44 | PSNR < 30 dB</small>
+                            <strong>AWGN Hancur (Simetris σ=1.2)</strong>
+                            <small>Sistem rusak berat (Invalid)</small>
                         </div>
                     </div>
                 </label>
@@ -319,7 +331,16 @@
                     <div class="sim-opt-inner">
                         <div>
                             <strong>Attack BPM (+30)</strong>
-                            <small>Manipulasi nilai data</small>
+                            <small>Manipulasi konstan (+30)</small>
+                        </div>
+                    </div>
+                </label>
+                <label class="sim-opt">
+                    <input type="radio" name="attackMode" value="ATTACK_BPM_LINEAR">
+                    <div class="sim-opt-inner">
+                        <div>
+                            <strong>Attack BPM (Linear)</strong>
+                            <small>Tertambah +5, +10, dst</small>
                         </div>
                     </div>
                 </label>
@@ -350,6 +371,10 @@
                         <input type="checkbox" id="autoScrollToggle" checked>
                         <span>Auto-scroll</span>
                     </label>
+                    <button class="btn-text" id="btnDownloadLog" title="Download Log Proses (TXT)"><i
+                            data-lucide="download"
+                            style="width:16px;height:16px;vertical-align:text-bottom;margin-right:4px;"></i>
+                        Export</button>
                     <button class="btn-text" id="btnClear">Clear</button>
                 </div>
             </div>

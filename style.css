@@ -590,6 +590,7 @@ body {
 }
 
 .sim-card-attack-bpm,
+.sim-card-attack-bpm-linear,
 .sim-card-attack-key {
     border: 2px solid var(--text) !important;
     background-color: rgba(26, 32, 44, 0.04) !important;
@@ -631,6 +632,39 @@ body {
 .sim-opt input:checked~.sim-opt-inner {
     border-color: var(--accent);
     background: rgba(79, 70, 229, 0.05);
+}
+
+/* Specific colors for when different modes are active */
+.sim-card-normal .sim-opt.active .sim-opt-inner,
+.sim-card-normal .sim-opt input:checked~.sim-opt-inner,
+.sim-card-awgn-ringan .sim-opt.active .sim-opt-inner,
+.sim-card-awgn-ringan .sim-opt input:checked~.sim-opt-inner {
+    border-color: var(--green);
+    background: rgba(22, 163, 74, 0.05);
+}
+
+.sim-card-awgn-sedang .sim-opt.active .sim-opt-inner,
+.sim-card-awgn-sedang .sim-opt input:checked~.sim-opt-inner,
+.sim-card-awgn-kritis .sim-opt.active .sim-opt-inner,
+.sim-card-awgn-kritis .sim-opt input:checked~.sim-opt-inner {
+    border-color: #ea580c;
+    background: rgba(234, 88, 12, 0.05);
+}
+
+.sim-card-awgn-hancur .sim-opt.active .sim-opt-inner,
+.sim-card-awgn-hancur .sim-opt input:checked~.sim-opt-inner {
+    border-color: var(--red);
+    background: rgba(220, 38, 38, 0.05);
+}
+
+.sim-card-attack-bpm .sim-opt.active .sim-opt-inner,
+.sim-card-attack-bpm .sim-opt input:checked~.sim-opt-inner,
+.sim-card-attack-bpm-linear .sim-opt.active .sim-opt-inner,
+.sim-card-attack-bpm-linear .sim-opt input:checked~.sim-opt-inner,
+.sim-card-attack-key .sim-opt.active .sim-opt-inner,
+.sim-card-attack-key .sim-opt input:checked~.sim-opt-inner {
+    border-color: var(--text);
+    background: rgba(26, 32, 44, 0.05);
 }
 
 
