@@ -291,11 +291,18 @@
                     </div>
                 </label>
                 <label class="sim-opt">
+                    <input type="radio" name="attackMode" value="COMPRESS_SYMMETRIC">
+                    <div class="sim-opt-inner">
+                        <div>
+                            <strong>KOMPRESI SIMETRIS (+/- 0.8)</strong>
+                        </div>
+                    </div>
+                </label>
+                <label class="sim-opt">
                     <input type="radio" name="attackMode" value="AWGN_RINGAN">
                     <div class="sim-opt-inner">
                         <div>
-                            <strong>AWGN Ringan (Simetris σ=0.3)</strong>
-                            <small>Sistem aman (Valid)</small>
+                            <strong>AWGN_RINGAN (σ=0.3)</strong>
                         </div>
                     </div>
                 </label>
@@ -303,8 +310,7 @@
                     <input type="radio" name="attackMode" value="AWGN_SEDANG">
                     <div class="sim-opt-inner">
                         <div>
-                            <strong>AWGN Sedang (Simetris σ=0.6)</strong>
-                            <small>Batas QIM mulai terganggu</small>
+                            <strong>AWGN_SEDANG (σ=0.6)</strong>
                         </div>
                     </div>
                 </label>
@@ -312,8 +318,7 @@
                     <input type="radio" name="attackMode" value="AWGN_KRITIS">
                     <div class="sim-opt-inner">
                         <div>
-                            <strong>AWGN Kritis (Simetris σ=0.9)</strong>
-                            <small>Batas QIM terlampaui (Invalid)</small>
+                            <strong>AWGN_KRITIS (σ=0.9)</strong>
                         </div>
                     </div>
                 </label>
@@ -321,8 +326,7 @@
                     <input type="radio" name="attackMode" value="AWGN_HANCUR">
                     <div class="sim-opt-inner">
                         <div>
-                            <strong>AWGN Hancur (Simetris σ=1.2)</strong>
-                            <small>Sistem rusak berat (Invalid)</small>
+                            <strong>AWGN_HANCUR (σ=1.2)</strong>
                         </div>
                     </div>
                 </label>

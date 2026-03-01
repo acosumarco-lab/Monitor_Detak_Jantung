@@ -42,8 +42,9 @@ const CFG = {
 
     // --- Keamanan Watermark ---
     SECRET_KEY: 'RahasiaPolban',     // Kunci rahasia untuk verifikasi (HARUS SAMA dengan pengirim)
-    QIM_DELTA: 2.0,                  // Step size QIM (HARUS SAMA dengan pengirim)
-    BER_THRESHOLD: 30.0,             // Batas BER (%) — di bawah ini dianggap valid
+    QIM_DELTA: 4.0,                  // Step size QIM (HARUS SAMA dengan pengirim)
+    BER_THRESHOLD: 12.5,             // Batas maksimal BER (%)
+    PSNR_THRESHOLD: 35.0,            // Batas minimal PSNR (dB) — di bawah ini dianggap manipulasi
     MAX_BPM_REF: 200.0,             // Nilai referensi untuk perhitungan PSNR
 
     // --- Parameter Serangan ATTACK_KEY ---
@@ -52,7 +53,7 @@ const CFG = {
     // --- UI/Chart ---
     CHART_MAX: 60,                   // Maksimal data point di grafik BPM
     BER_CHART_MAX: 20,               // Maksimal bar di grafik BER history
-    LOG_MAX_LINES: 200,              // Maksimal baris log (mencegah memory leak)
+    LOG_MAX_LINES: 3500,             // Maksimal baris log (Cukup untuk ~150 blok)
     ALERT_BPM_LOW: 40,              // Batas BPM rendah untuk alert
     ALERT_BPM_HIGH: 180,            // Batas BPM tinggi untuk alert
 };
@@ -320,13 +321,13 @@ function embedQIMAttack(cD, watermarkBits) {
  * [4] Bandingkan expected vs extracted
  * [5] Kesimpulan: BER, MSE, PSNR, status
  *
- * @param {number[]} received - Data asli dari MQTT (sebelum attack)
+ * @param {number[]} wmData - Data setelah watermarking (sebelum attack)
  * @param {number[]} processed - Data setelah attack simulation
  * @param {number} seq - Nomor urut blok
  * @param {string} mode - Mode pengujian ('NORMAL', 'NOISE', 'ATTACK_BPM', 'ATTACK_KEY')
  * @returns {{status: string, ber: number, mse: number, psnr: number, log: string}}
  */
-function verifyWatermark(received, processed, seq, mode) {
+function verifyWatermark(received, wmData, processed, seq, mode) {
     const log = [];  // Array untuk menyimpan baris-baris log
 
     // === HEADER ===
@@ -338,15 +339,28 @@ function verifyWatermark(received, processed, seq, mode) {
     log.push(`[0] Data Diterima (Raw ${processed.length}): [${processed.map(x => x.toFixed(2)).join(', ')}]`);
 
     // === HITUNG MSE & PSNR ===
-    let mseSum = 0;
-    for (let i = 0; i < received.length; i++) mseSum += (received[i] - processed[i]) ** 2;
-    const mse = mseSum / received.length;
-    const psnr = mse === 0 ? 100.0 : 20 * Math.log10(CFG.MAX_BPM_REF / Math.sqrt(mse));
+    // Baseline MSE = Raw vs Watermarked
+    // Final MSE = Raw vs Processed
+    let mseBaselineSum = 0;
+    let mseFinalSum = 0;
+    for (let i = 0; i < received.length; i++) {
+        mseBaselineSum += (received[i] - wmData[i]) ** 2;
+        mseFinalSum += (received[i] - processed[i]) ** 2;
+    }
+
+    const mseBaseline = mseBaselineSum / received.length;
+    const mseFinal = mseFinalSum / received.length;
+    const mseDiff = mseFinal - mseBaseline; // Berapa lonjakan MSE akibat serangan/kompresi?
+    const psnr = mseFinal === 0 ? 100.0 : 20 * Math.log10(CFG.MAX_BPM_REF / Math.sqrt(mseFinal));
 
     // Tampilkan info serangan jika bukan NORMAL
     if (mode !== 'NORMAL') {
         log.push(`[SIMULASI: ${mode}]`);
-        log.push(`  > MSE: ${mse.toFixed(4)} | PSNR: ${psnr.toFixed(2)} dB`);
+        log.push(`  > MSE Akhir    : ${mseFinal.toFixed(4)} | PSNR: ${psnr.toFixed(2)} dB`);
+        log.push(`  > MSE Baseline : ${mseBaseline.toFixed(4)}`);
+        log.push(`  > Lonjakan MSE : +${mseDiff.toFixed(4)}`);
+    } else {
+        log.push(`  > MSE Bawaan (Watermark): ${mseBaseline.toFixed(4)}`);
     }
 
     // === [1] DWT — dekomposisi sinyal ===
@@ -389,15 +403,32 @@ function verifyWatermark(received, processed, seq, mode) {
     const ber = (errors / numBits) * 100;
 
     // === [5] KESIMPULAN ===
-    const status = ber <= CFG.BER_THRESHOLD ? 'VALID' : 'INVALID';
+    // Syarat valid: BER masuk akal, PSNR masuk akal, dan mutlak lonjakan MSE akibat serangan <= 1.0
+    // (Agar QIM bawaan yang MSE-nya wajar tidak ditolak)
+    const isBerValid = ber <= CFG.BER_THRESHOLD;
+    const isPsnrValid = psnr >= CFG.PSNR_THRESHOLD;
+    const isMseValid = Math.abs(mseDiff) <= 1.0;
+
+    const isAuthentic = isBerValid && isPsnrValid && isMseValid;
+    const status = isAuthentic ? 'VALID' : 'INVALID';
     log.push('[5] KESIMPULAN');
     log.push(`  > Error Bits: ${errors}/${numBits}`);
-    log.push(`  > BER: ${ber.toFixed(2)}%`);
-    log.push(`  > MSE: ${mse.toFixed(4)} | PSNR: ${psnr.toFixed(2)} dB`);
-    log.push(`  > STATUS: ${status === 'VALID' ? '[VALID] DATA OTENTIK' : '[INVALID] DATA DIMANIPULASI'}`);
+    log.push(`  > BER: ${ber.toFixed(2)}% | PSNR: ${psnr.toFixed(2)} dB`);
+    log.push(`  > Tambahan MSE akibat serangan: +${mseDiff.toFixed(4)}`);
+
+    if (isAuthentic) {
+        log.push('  > STATUS: [VALID] DATA OTENTIK');
+    } else {
+        let reasons = [];
+        if (!isBerValid) reasons.push("BER BURUK");
+        if (!isPsnrValid) reasons.push("PSNR BURUK");
+        if (!isMseValid) reasons.push(`LOMPATAN MSE > 1.0 (+${mseDiff.toFixed(2)})`);
+
+        log.push(`  > STATUS: [INVALID] DATA DIMANIPULASI (${reasons.join(' & ')})`);
+    }
     log.push('='.repeat(50));
 
-    return { status, ber, mse, psnr, log: log.join('\n') };
+    return { status, ber, mse: mseFinal, psnr, log: log.join('\n') };
 }
 
 // ===================================================================================
@@ -695,7 +726,7 @@ function updateSecure(result, seq) {
  * @param {string} mode - Mode serangan aktif
  */
 function pushBlockHistory(seq, result, mode) {
-    const MAX_ROWS = 50;
+    const MAX_ROWS = 150;
     const now = new Date().toLocaleTimeString('id-ID');
     const isValid = result.status === 'VALID';
 
@@ -740,7 +771,7 @@ function pushBlockHistory(seq, result, mode) {
  * @param {number[]} watermarked - Data setelah watermarking
  */
 function pushDataHistory(seq, raw, watermarked) {
-    const MAX_BLOCKS = 50;
+    const MAX_BLOCKS = 150;
     if (!raw || !watermarked || raw.length === 0) return;
 
     // Hapus placeholder "Belum ada data" jika ada
@@ -865,7 +896,15 @@ function gaussianRandom(mean, sigma) {
  * @returns {number[]} - Data yang sudah diproses sesuai mode
  */
 function applyAttack(data, mode) {
-    if (mode.startsWith('AWGN')) {
+    if (mode === 'COMPRESS_SYMMETRIC') {
+        const result = [...data];
+        for (let i = 0; i < result.length - 1; i += 2) {
+            result[i] += 0.8;
+            result[i + 1] -= 0.8;
+        }
+        return result;
+
+    } else if (mode.startsWith('AWGN')) {
         // AWGN (Symmetrical Noise): Menjaga batas LL agar Hash tidak rusak.
         // Konsep: x_0 mendapat +noise, x_1 mendapat -noise. 
         // Sehingga Haar DWT cA = (x0+x1)/sqrt(2) tetap statis, dan Hash aman.
@@ -1006,15 +1045,17 @@ function connectMQTT() {
                 const compMs = p.comp_ms || 0;       // Waktu komputasi ESP32 (ms)
 
                 const processed = applyAttack(wmData, attackMode);  // Terapkan simulasi
-                const result = verifyWatermark(wmData, processed, seqNum, attackMode);
+
+                // Parameter: rawData (Asli Ground Truth), wmData (Watermark Murni), processed (Setalah diserang)
+                const result = verifyWatermark(rawData, wmData, processed, seqNum, attackMode);
                 updateSecure(result, seqNum);         // Update UI watermark
 
-                // Update grafik perbandingan (raw vs watermarked)
-                updateCompare(rawData, wmData);
+                // Update grafik perbandingan (raw vs watermarked pasca simulasi)
+                updateCompare(rawData, processed);
 
-                // Update history tables
+                // Update history tables (menggunakan data pasca simulasi)
                 pushBlockHistory(seqNum, result, attackMode);
-                pushDataHistory(seqNum, rawData, wmData);
+                pushDataHistory(seqNum, rawData, processed);
 
                 // Update computation time
                 if (compMs > 0) updateCompTime(compMs);

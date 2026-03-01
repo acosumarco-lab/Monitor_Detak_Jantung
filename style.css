@@ -638,7 +638,9 @@ body {
 .sim-card-normal .sim-opt.active .sim-opt-inner,
 .sim-card-normal .sim-opt input:checked~.sim-opt-inner,
 .sim-card-awgn-ringan .sim-opt.active .sim-opt-inner,
-.sim-card-awgn-ringan .sim-opt input:checked~.sim-opt-inner {
+.sim-card-awgn-ringan .sim-opt input:checked~.sim-opt-inner,
+.sim-card-compress-symmetric .sim-opt.active .sim-opt-inner,
+.sim-card-compress-symmetric .sim-opt input:checked~.sim-opt-inner {
     border-color: var(--green);
     background: rgba(22, 163, 74, 0.05);
 }
@@ -761,7 +763,7 @@ body {
 }
 
 .log-wrap {
-    max-height: 320px;
+    max-height: 700px;
     overflow-y: auto;
     padding: 16px 20px;
 }
